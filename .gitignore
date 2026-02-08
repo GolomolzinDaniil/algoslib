@@ -1,0 +1,12 @@
+.venv
+.vscode
+build
+__pycache__
+*.so
+
+# /*
+# !.gitignore
+# !README.md
+# !requirements.txt
+# !/sorting
+# !/sorting/**
