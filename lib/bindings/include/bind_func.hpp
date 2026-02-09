@@ -4,6 +4,11 @@
 
 namespace py = pybind11;
 
+
+// python - хранит в непрерывном куске памяти указатели на разные типы элементов
+// numpy  - хранит сырые данные (явно, без указателей). Тоже непрерывно
+
+
 // вспомогательные для перевода типов python <-> cpp
 template<typename T>
 std::vector<T> numpy_to_vector(const py::array_t<T>& arr) {
