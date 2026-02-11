@@ -94,7 +94,7 @@ py::array bubble_sort_bind(Func&& func, py::object obj) {
     }
     else if (arr_dtype.is(py::dtype::of<float>())) {
 
-        auto arr_typed = arr.cast<py::array_t<std::float8>>();
+        auto arr_typed = arr.cast<py::array_t<std::float>>();
         std::vector<float> vec = numpy_to_vector(arr_typed);
         func(vec);
         res = vector_to_numpy(vec);
