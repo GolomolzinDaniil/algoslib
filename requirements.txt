@@ -3,3 +3,6 @@
 numpy>=2.4.2
 pybind11>=3.0.1
 setuptools>=80.10.2
+
+# для визуализации
+matplotlib>=3.10.8

@@ -1,158 +1,127 @@
-#include "../../lib/bindings/include/bind_func.hpp"
-#include "../../lib/sorting/include/algorithms.hpp"
 #include <cstdint>
 
+#include "../../lib/bindings/include/bind_func.hpp"
+#include "../../lib/sorting/include/bubble_sort.hpp"
+#include "../../lib/sorting/include/sorting_utils.hpp"
 
-// template<typename Func, typename ... Types>
-// py::object helper(Func&& func, py::array arr) {
 
-//     auto arr_dtype = arr.dtype();
-//     bool fl = false;
-//     py::object res;
 
-//     (([&]() {
-//         if (!fl && arr_dtype.is(py::dtype::of<Types>())) {
-    
-//             auto arr_typed = arr.cast<py::array_t<Types>>();
 
-//             std::vector<Types> vec = numpy_to_vector(arr_typed);
-    
-//             func(vec);
-            
-//             res = vector_to_numpy(vec);
-//             fl = true;
-//         }
-//     })(), ...);
+// template<typename Func>
+// py::array bubble_sort_bind(Func&& func, py::object obj) {
 
-//     if (!fl) {
-//         throw std::runtime_error("Unsupported dtype: " + std::string(py::str(arr.dtype())));
+//     // будем переводить и работать с np.array
+//     py::array arr;
+
+//     // если python-list or python-tuple 
+//     if (py::isinstance<py::list>(obj) || py::isinstance<py::tuple>(obj) || py::isinstance<py::array>(obj)) {
+//         arr = py::array(obj);
+//     }
+//     // иначе если не np.array, то фигня
+//     else  {
+//         throw std::runtime_error("Input must be a [list, tuple, np.array(1D)]");
 //     }
 
-//     return res;
-// };
+//     // оперируем (пока что) только одномерными массивами
+//     if (arr.ndim() != 1) {
+//         throw std::invalid_argument("");
+//     }
 
-// template<typename Func, typename T>
-// py::array_t<T> a(Func&& func, py::array_t<T> arr) {
 
-//     // auto arr_typed = arr.cast<py::array_t<T>>();
-//     std::vector<T> vec = numpy_to_vector(arr_typed);
+//     auto arr_dtype = arr.dtype();
 
-//     func(vec);
+//     py::array res;
 
-//     return vector_to_numpy(vec);
+//     if      (arr_dtype.is(py::dtype::of<std::int32_t>())) {
+
+//         auto arr_typed = arr.cast<py::array_t<std::int32_t>>();
+//         std::vector<std::int32_t> vec = numpy_to_vector(arr_typed);
+//         func(vec);
+//         res = vector_to_numpy(vec);
+//     }
+//     else if (arr_dtype.is(py::dtype::of<std::int64_t>())) {
+
+//         auto arr_typed = arr.cast<py::array_t<std::int64_t>>();
+//         std::vector<std::int64_t> vec = numpy_to_vector(arr_typed);
+//         func(vec);
+//         res = vector_to_numpy(vec);
+//     }
+//     else if (arr_dtype.is(py::dtype::of<double>())) {
+
+//         auto arr_typed = arr.cast<py::array_t<double>>();
+//         std::vector<double> vec = numpy_to_vector(arr_typed);
+//         func(vec);
+//         res = vector_to_numpy(vec);
+//     }
+//     else if (arr_dtype.is(py::dtype::of<float>())) {
+
+//         auto arr_typed = arr.cast<py::array_t<float>>();
+//         std::vector<float> vec = numpy_to_vector(arr_typed);
+//         func(vec);
+//         res = vector_to_numpy(vec);
+//     }
+//     else {
+//         throw std::invalid_argument("Dolbaeb peredavai normalnye types");
+//     }
+//     return res
 // }
 
+
+
 template<typename Func>
-py::array bubble_sort_bind(Func&& func, py::object obj) {
+py::list sort_bind(Func&& func, py::array arr) {
 
-    // будем переводить и работать с np.array
-    py::array arr;
+    py::list history_py;
 
-    // если python-list or python-tuple 
-    if (py::isinstance<py::list>(obj) || py::isinstance<py::tuple>(obj) || py::isinstance<py::array>(obj)) {
-        arr = py::array(obj);
-    }
-    // иначе если не np.array, то фигня
-    else  {
-        throw std::runtime_error("Input must be a [list, tuple, np.array(1D)]");
-    }
-
-    // оперируем (пока что) только одномерными массивами
-    if (arr.ndim() != 1) {
-        throw std::invalid_argument("");
-    }
-
-
-    // pybind11 требует явной передачи по типу (Гандон)
-    // (Кто сможет переписать через ... Types = <double, float, ...> чтобы не было ошибки 304, тому куплю пива)
+    std::vector<Step_0> history_cpp;
 
     auto arr_dtype = arr.dtype();
 
-    py::array res;
+    // 1. типов много. Придумать как сократить код
+    
+    if (arr_dtype.is(py::dtype::of<std::int64_t>())) {
 
-    // временно такие типы, но желательно все типы, поддерживаемые numpy)))
-    if      (arr_dtype.is(py::dtype::of<std::int32_t>())) {
+        auto typed_arr = arr.cast<py::array_t<std::int64_t>>();
 
-        auto arr_typed = arr.cast<py::array_t<std::int32_t>>();
-        std::vector<std::int32_t> vec = numpy_to_vector(arr_typed);
-        func(vec);
-        res = vector_to_numpy(vec);
+        std::vector<std::int64_t> vec = numpy_to_vector(typed_arr);
+        
+        history_cpp = func(vec);
+
+        // 2. разные сортировки -> разные (возможно) структуры. Вынести в отдельную функций цикл
+
+        for (const auto& step : history_cpp) {
+
+            history_py.append(
+                py::dict(
+                    py::arg("fst") = step.fst,
+                    py::arg("snd") = step.snd,
+                    py::arg("is_swap") = step.is_swap,
+                    py::arg("sorted") = step.sorted
+                )
+            );
+        }
+
+
     }
-    else if (arr_dtype.is(py::dtype::of<std::int64_t>())) {
+    else throw std::invalid_argument("Unsupported arr's type");
 
-        auto arr_typed = arr.cast<py::array_t<std::int64_t>>();
-        std::vector<std::int64_t> vec = numpy_to_vector(arr_typed);
-        func(vec);
-        res = vector_to_numpy(vec);
-    }
-    else if (arr_dtype.is(py::dtype::of<double>())) {
-
-        auto arr_typed = arr.cast<py::array_t<double>>();
-        std::vector<double> vec = numpy_to_vector(arr_typed);
-        func(vec);
-        res = vector_to_numpy(vec);
-    }
-    else if (arr_dtype.is(py::dtype::of<float>())) {
-
-        auto arr_typed = arr.cast<py::array_t<float>>();
-        std::vector<float> vec = numpy_to_vector(arr_typed);
-        func(vec);
-        res = vector_to_numpy(vec);
-    }
-    else {
-        throw std::invalid_argument("Dolbaeb peredavai normalnye types");
-    }
-
-    // поэтому будем перебирать (можно попробовать через (... Types) сделать)
-    // if (arr_dtype.is(py::dtype::of<double>())) {
-
-    //     auto arr_typed = arr.cast<py::array_t<double>>();
-
-    //     res = a(bubble_sort<double>, arr_typed);
-    // }
-    // else if (arr_dtype.is(py::dtype::of<std::int64_t>())) {
-    //     res = a<std::int64_t>([](auto& v) { bubble_sort(v); }, arr);
-    // }
-    // else if (arr_dtype.is(py::dtype::of<double>())) {
-    //     res = a<double>([](auto& v) { bubble_sort(v); }, arr);
-    // }
-    // else if (arr_dtype.is(py::dtype::of<float>())) {
-    //     res = a<float>([](auto& v) { bubble_sort(v); }, arr);
-    // }
-    // else {
-    //     throw std::runtime_error("Unsupported dtype: " + std::string(py::str(arr_dtype)));
-    // }
-
-    // return helper<std::int32_t, std::int64_t, float, double>(
-    //     [](auto& vec) {
-    //         bubble_sort(vec);
-    //     },
-    //     arr
-    // );
-
-    return res;
+    return history_py;
 };
 
 
-// Все PyBind11 bindings (sorting), нужные для перевода кода из Плюсов в Пайтон
+
 
 PYBIND11_MODULE(sub_sorting, m) {
 
     m.doc() = "C++ сортировки для python";
-    
-    // при перегрузки тип данных будет присвоен типу ПЕРВОМУ объявлению
-    // m.def("bubble_sort", bubble_sort_bind<float>,   py::arg("array"), "Сортировка пузырьком");
-    // m.def("bubble_sort", bubble_sort_bind<double>,  py::arg("array"), "Сортировка пузырьком");
-    // m.def("bubble_sort", bubble_sort_bind<int32_t>, py::arg("array"), "Сортировка пузырьком");
-    // m.def("bubble_sort", bubble_sort_bind<int64_t>, py::arg("array"), "Сортировка пузырьком");
 
-    // дабы избавиться от дублирования кода делаем через лямбду лямбды бляьб (в итоге все равно дублирование, то уже в bubble_sort_bind)
-    m.def("bubble_sort", [](py::object obj) {
-        return bubble_sort_bind([](auto& vec) {
-            bubble_sort(vec);
-        }, obj);
-    }, py::arg("array"), "Сортировка пузырьком");
 
+    m.def("bubble_sort",
+        [](py::array obj) {
+            return sort_bind([](auto& arr) {
+                return bubble_sort(arr);
+            }, obj);
+        }, py::arg("arr"), "История для визуала Сортировка пузырьком");
 
 
 };

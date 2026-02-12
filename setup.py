@@ -21,11 +21,10 @@ extensions = [
         name='algoslib.sorting.sub_sorting', # from algoslib.sorting import *
         sources=[
             'algoslib/sorting/sub_sorting.cpp',
-            # 'algoslib/lib/sorting/algorithms/bubble_sort.cpp'
         ],
         include_dirs=[
             pybind11.get_include(),
-            'algoslib/sorting/include'
+            'algoslib/sorting/include/'
         ],
         language='c++',
         extra_compile_args=compile_flags,
