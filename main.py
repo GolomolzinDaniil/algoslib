@@ -4,10 +4,7 @@ from algoslib.sorting import bubble_sort
 
 import numpy as np
 
-arr = np.array([1,4,7,-1,34,6.0], dtype=np.float64)
+arr = np.array([1,5,2,8,45,2,8,2,8], dtype=np.int64)
 
 arr = bubble_sort(arr)
-# print(arr)
-
-arr = np.array([arr])
-print(arr.dtype)
+print(*arr, sep='\n')
