@@ -3,9 +3,9 @@
 
 
 template<typename T>
-std::vector<Step_0> bubble_sort(std::vector<T>& arr) {
+std::vector<Step> bubble_sort(std::vector<T>& arr) {
 
-    std::vector<Step_0> history;
+    std::vector<Step> history;
 
     bool flag = false;
     const size_t arr_len = arr.size();
