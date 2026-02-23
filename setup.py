@@ -2,8 +2,6 @@ from setuptools import setup, Extension
 import pybind11
 import sys
 
-
-
 # ВСЕ ЗАВИСИТ ОТ ОС
 if sys.platform == 'win32':
     compile_flags = ['/O2', '/std:c++17', '/MD']
@@ -12,13 +10,12 @@ else:
     compile_flags = ['-O3', '-std=c++17', '-fPIC']
     link_flags = []
 
-
 # расширения для нужной сборки
 extensions = [
 
     # sorting
     Extension(
-        name='algoslib.sorting.sub_sorting', # from algoslib.sorting import *
+        name='algoslib.sorting.sub_sorting',  # from algoslib.sorting import *
         sources=[
             'algoslib/sorting/sub_sorting.cpp',
         ],
@@ -30,7 +27,22 @@ extensions = [
         extra_compile_args=compile_flags,
         # extra_link_args=
     ),
-    # остальные разделы (типо graphs)
+
+    # graphs
+    Extension(
+        name='algoslib.graphs.sub_graphs',  # from algoslib.graphs import *
+        sources=[
+            'algoslib/graphs/sub_graphs.cpp',
+            'lib/graphs/src/bfs.cpp',
+        ],
+        include_dirs=[
+            pybind11.get_include(),
+            'lib/graphs/include/',  # заголовочные файлы для графов
+        ],
+        language='c++',
+        extra_compile_args=compile_flags,
+        # extra_link_args=
+    ),
 ]
 
 setup(
