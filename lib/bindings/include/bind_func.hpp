@@ -1,9 +1,12 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
+#include <iostream>
+
+#include "../../sorting/include/sorting_utils.hpp"
+
 
 namespace py = pybind11;
-
 
 // python - хранит в непрерывном куске памяти указатели на разные типы элементов
 // numpy  - хранит сырые данные (явно, без указателей). Тоже непрерывно
@@ -11,7 +14,7 @@ namespace py = pybind11;
 
 // вспомогательные для перевода типов python <-> cpp
 template<typename T>
-std::vector<T> numpy2vector(const py::array_t<T>& arr) {
+std::vector<T> numpy2vector(const py::array& arr) {
 
     if (arr.ndim() != 1) {
         throw std::runtime_error("Expected 1D dimension, but passed " + std::to_string(arr.ndim()));
@@ -84,30 +87,32 @@ py::list type_dispatcher(Func&& func, const py::object& obj) {
         }
         // с плавающей точкой
         else if (dtype.is(py::dtype::of<float>())) {
-            auto vec = numpy2vector(arr);
+            auto vec = numpy2vector<float>(arr);
             history = func(vec);
         }
         else if (dtype.is(py::dtype::of<double>())) {
-            auto vec = numpy2vector(arr);
+            auto vec = numpy2vector<double>(arr);
             history = func(vec);          
         }
         else {
-            throw std::invalid_argument("Unsupported type: " + std::to_string(dtype))
+            throw std::invalid_argument("Unsupported type: " + py::str(dtype).cast<std::string>());
         }
     }
     // иначе python объект
     else if (
         py::isinstance<py::list>(obj) || py::isinstance<py::tuple>(obj) ||
-        py::isinstance(py::frozenset) || py::isinstance(py::set)
-    ) {
-        std::cout << "For more type support, use np.array";
-        try {
-            auto vec = obj.cast<std::vector<int64_t>>();
-            history = func(vec);
-        } catch (...) {
-            auto vec = obj.cast<std::vector<double>>();
-            history = func(vec);
-        }
+        py::isinstance<py::frozenset>(obj) || py::isinstance<py::set>(obj)) {
+
+            std::cout << "For more type support, use np.array" << std::endl;
+            try {
+                auto vec = obj.cast<std::vector<int64_t>>();
+                // auto vec = numpy2vector<int64_t>(obj);
+                history = func(vec);
+            } catch (...) {
+                auto vec = obj.cast<std::vector<double>>();
+                // auto vec = numpy2vector<double>(obj);
+                history = func(vec);
+            }
     }
     else {
         throw std::invalid_argument(
