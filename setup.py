@@ -48,5 +48,8 @@ extensions = [
 setup(
     name='algoslib',
     ext_modules=extensions,
-    zip_safe=False
+    zip_safe=False,
+    package_data={
+        'algoslib.sorting': ['sub_sorting.pyi'],
+    },
 )

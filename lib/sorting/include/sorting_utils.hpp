@@ -3,8 +3,8 @@
 #include <vector>
 #include <utility>
 
-/* bubble, */
-struct Step_0 {
+
+struct Step {
     // индекс ПЕРВОГО сравниваемого элемента
     size_t fst;
     // индекс ВТОРОГО сравниваемого элемента
