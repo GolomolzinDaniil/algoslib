@@ -34,6 +34,7 @@ extensions = [
         sources=[
             'algoslib/graphs/sub_graphs.cpp',
             'lib/graphs/src/bfs.cpp',
+            'lib/graphs/src/dijkstra.cpp'
         ],
         include_dirs=[
             pybind11.get_include(),
@@ -51,5 +52,6 @@ setup(
     zip_safe=False,
     package_data={
         'algoslib.sorting': ['sub_sorting.pyi'],
+        'algoslib.graphs': ['sub_graphs.pyi']
     },
 )
