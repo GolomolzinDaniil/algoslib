@@ -23,3 +23,30 @@ struct BFS_Step {
     std::vector<int> visited;
     std::vector<int> queue;
 };
+
+// представление взвешенного графа через список пар смежности с весами
+struct Graph {
+    std::unordered_map<int, std::vector<std::pair<int, double>>> adjacency_list;
+
+    void add_edge(int u, int v, double weight) {
+        adjacency_list[u].emplace_back(v, weight);
+        adjacency_list[v].emplace_back(u, weight); // для неориентированного
+    }
+
+    std::vector<int> get_neighbors(int u) const {
+        std::vector<int> neighbors;
+
+        for (const auto& [neighbor, weight] : adjacency_list.at(u))
+            neighbors.push_back(neighbor);
+        
+        return neighbors;
+    }
+};
+
+// структура для шагов Дейкстры
+struct DijkstraStep {
+    int current;
+    std::vector<int> distances;
+    std::vector<bool> visited;
+    std::vector<int> queue;
+};
