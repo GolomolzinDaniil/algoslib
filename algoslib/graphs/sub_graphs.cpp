@@ -31,7 +31,7 @@ PYBIND11_MODULE(sub_graphs, m) {
              "Вернуть список соседей с весами: List[Tuple[int, float]]");
 
     // Структура шага алгоритма Дейкстры
-    py::class_<Dijkstra_Step>(m, "DijkstraStep")
+    py::class_<Dijkstra_Step>(m, "Dijkstra_Step")
         .def_readonly("current_node", &Dijkstra_Step::current_node, 
                       "Текущая обрабатываемая вершина")
         .def_readonly("distances", &Dijkstra_Step::distances, 
