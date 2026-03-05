@@ -1,4 +1,4 @@
-from .visualizer import visual_bubble_sort
+from .visual import visual_bubble_sort
 
 __version__ = '0.0.1'
 
