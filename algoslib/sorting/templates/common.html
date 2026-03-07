@@ -172,24 +172,47 @@
             transition: { duration: animationSpeed }
         };
 
+        function getNiceYTicks(minVal, maxVal) {
+            const ticks = [];
+            for (let v = Math.floor(minVal); v <= Math.ceil(maxVal); v++) {
+                ticks.push(v);
+            }
+            return ticks;
+        }
+        const yMin = Math.min(...initialData) - 1;
+        const yMax = Math.max(...initialData) + 1;
+        const yTicks = getNiceYTicks(yMin, yMax);
+
         const layout = {
             title: { text: 'Старт', font: { color: '#cdd6f4' } },
-            margin: { t: 40, b: 40, l: 40, r: 40 },
+            margin: { t: 40, b: 50, l: 50, r: 20 },
             paper_bgcolor: '#181825',
             plot_bgcolor: '#181825',
-            font: { color: '#cdd6f4' },
-            xaxis: { range: [-0.5, initialData.length - 0.5], showgrid: false },
-            yaxis: { range: [0, Math.max(...initialData) + 1], gridcolor: '#313244' },
-            // yaxis: {
-            //     range: [
-            //         Math.min(...initialData) - 1,
-            //         Math.max(...initialData) + 1
-            //     ],
-            //     gridcolor: '#313244',
-            //     zeroline: true,
-            //     zerolinecolor: '#666'
-            // },
-            showlegend: false, hovermode: false
+            font: { color: '#cdd6f4', family: 'Segoe UI' },
+
+            xaxis: {
+                range: [-0.5, initialData.length - 0.5],
+                showgrid: false,
+                tickmode: 'linear',
+                dtick: 1,
+                tickcolor: '#cdd6f4',
+                tickfont: { color: '#cdd6f4', size: 10 }
+            },
+
+            yaxis: {
+                range: [yMin, yMax],
+                tickmode: 'array',
+                tickvals: yTicks,
+                tickformat: 'd',
+                gridcolor: '#313244',
+                zeroline: true,
+                zerolinecolor: '#666',
+                showticklabels: true,
+                tickcolor: '#cdd6f4',
+                tickfont: { color: '#cdd6f4', size: 11 }
+            },
+            showlegend: false,
+            hovermode: false
         };
 
         Plotly.newPlot('plot', [trace], layout, { responsive: true, displayModeBar: false });
