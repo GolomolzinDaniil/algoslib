@@ -1,23 +1,277 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=s, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>bubble_sort</title>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e2e;
+            color: #cdd6f4;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #89b4fa;
+            margin-bottom: 10px;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1000px;
+            background: #2b2b40;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        #plot {
+            width: 100%;
+            height: 450px;
+            background: #181825;
+            border-radius: 8px;
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            align-items: center;
+        }
+
+        button {
+            background: #45475a;
+            color: #cdd6f4;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: bold;
+            min-width: 100px;
+        }
+
+        button:hover {
+            background: #585b70;
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.primary {
+            background: #89b4fa;
+            color: #1e1e2e;
+        }
+
+        button.primary:hover {
+            background: #b4befe;
+        }
+
+        #status {
+            margin-top: 15px;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+            color: #a6e3a1;
+            font-size: 1.1em;
+            min-height: 1.5em;
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9em;
+            color: #a6adc8;
+        }
+
+        input[type=range] {
+            cursor: pointer;
+        }
+    </style>
 </head>
+
 <body>
 
-    <style></style>
+    <div class="container">
+        <h1>Bubble Sort</h1>
+
+        <div id="plot"></div>
+
+        <div class="controls">
+            <button onclick="prevStep()">⏪ Назад</button>
+            <button class="primary" id="playBtn" onclick="togglePlay()">▶ Старт</button>
+            <button onclick="nextStep()">Вперед ⏩</button>
+
+            <div class="speed-control">
+                <span>Скорость:</span>
+                <input type="range" id="speedRange" min="50" max="1000" value="300" step="50"
+                    oninput="updateSpeed(this.value)">
+                <span id="speedValue">300ms</span>
+            </div>
+        </div>
+
+        <div id="status">Готов к работе</div>
+    </div>
+
     <script>
+        // === ДАННЫЕ ===
+        const history = {{ history| safe }};
+        const initialArray = {{ initial_array| safe }};
 
-        // здесь происходит замена переменной
-        const history = {{history | safe}};
+        // === ВОССТАНОВЛЕНИЕ МАССИВА ===
+        function getCurrentData(stepIndex) {
+            let data = [...initialArray];
+            for (let i = 1; i <= stepIndex; i++) {
+                if (history[i].is_swap) {
+                    [data[history[i].fst], data[history[i].snd]] =
+                        [data[history[i].snd], data[history[i].fst]];
+                }
+            }
+            return data;
+        }
 
-        // ниже нужно реализовать функции для визуализации
-        function name(params) {
-            
+        // === ЦВЕТА ===
+        function getColorArray(data, fst, snd, sortedCount) {
+            return data.map((_, i) => {
+                if (sortedCount >= data.length) return '#a6e3a1';
+                if (i === fst || i === snd) return '#f38ba8';  // красные
+                if (sortedCount > 0 && i >= data.length - sortedCount) return '#a6e3a1';  // зелёные
+                return '#89b4fa';  // синие
+            });
+        }
+
+        // === ИНИЦИАЛИЗАЦИЯ ===
+        let currentStep = 0;
+        let isPlaying = false;
+        let timer = null;
+        let animationSpeed = 300;
+
+        const initialData = getCurrentData(0);
+        const firstStep = history[0];
+
+        const trace = {
+            x: initialData.map((_, i) => i),
+            y: initialData,
+            type: 'bar',
+            marker: {
+                color: getColorArray(initialData, firstStep.fst, firstStep.snd, firstStep.sorted),
+                line: { color: '#1e1e2e', width: 2 }
+            },
+            transition: { duration: animationSpeed }
+        };
+
+        const layout = {
+            title: { text: 'Старт', font: { color: '#cdd6f4' } },
+            margin: { t: 40, b: 40, l: 40, r: 40 },
+            paper_bgcolor: '#181825',
+            plot_bgcolor: '#181825',
+            font: { color: '#cdd6f4' },
+            xaxis: { range: [-0.5, initialData.length - 0.5], showgrid: false },
+            yaxis: { range: [0, Math.max(...initialData) + 1], gridcolor: '#313244' },
+            // yaxis: {
+            //     range: [
+            //         Math.min(...initialData) - 1,
+            //         Math.max(...initialData) + 1
+            //     ],
+            //     gridcolor: '#313244',
+            //     zeroline: true,
+            //     zerolinecolor: '#666'
+            // },
+            showlegend: false, hovermode: false
+        };
+
+        Plotly.newPlot('plot', [trace], layout, { responsive: true, displayModeBar: false });
+
+        // === ОТРИСОВКА ===
+        function updateGraph(idx) {
+            const step = history[idx];
+            const data = getCurrentData(idx);
+            const colors = getColorArray(data, step.fst, step.snd, step.sorted);
+
+            Plotly.react('plot', [{
+                y: data,
+                marker: { color: colors, line: { color: '#1e1e2e', width: 2 } },
+                type: 'bar',
+                transition: { duration: animationSpeed }
+            }], {
+                ...layout,
+                title: {
+                    text: `Шаг ${idx + 1}/${history.length} | ${idx === 0 ? 'СТАРТ' :
+                        idx === history.length - 1 ? 'ФИНИШ' :
+                            step.is_swap ? 'ОБМЕН' : 'СРАВНЕНИЕ'
+                        }`,
+                    font: { color: '#cdd6f4' }
+                }
+            }, { responsive: true, displayModeBar: false });
+
+            // Статус
+            let msg = idx === 0
+                ? `Старт: [${data.join(', ')}]` :
+                idx === history.length - 1
+                    ? `Готово: [${data.join(', ')}]` :
+                    step.is_swap
+                        ? `Обмен: ${step.fst}↔${step.snd}`
+                        : `Сравнение: ${step.fst} vs ${step.snd}`;
+            document.getElementById('status').innerText = msg;
+        }
+
+        // === УПРАВЛЕНИЕ ===
+        function nextStep() {
+            if (currentStep < history.length - 1) {
+                currentStep++;
+                updateGraph(currentStep);
+            } else {
+                stopPlay();
+            }
+        }
+        function prevStep() {
+            if (currentStep > 0) {
+                currentStep--;
+                updateGraph(currentStep);
+                stopPlay();
+            }
+        }
+        function togglePlay() {
+            const btn = document.getElementById('playBtn');
+            if (isPlaying) { stopPlay(); }
+            else {
+                if (currentStep >= history.length - 1) currentStep = 0;
+                isPlaying = true;
+                btn.innerText = "⏸ Пауза";
+                btn.classList.remove('primary');
+                runLoop();
+            }
+        }
+        function runLoop() {
+            if (!isPlaying || currentStep >= history.length - 1) { stopPlay(); return; }
+            nextStep();
+            timer = setTimeout(runLoop, animationSpeed);
+        }
+        function stopPlay() {
+            isPlaying = false;
+            clearTimeout(timer);
+            const btn = document.getElementById('playBtn');
+            btn.innerText = "▶ Старт";
+            btn.classList.add('primary');
+        }
+        // === СКОРОСТЬ ===
+        function updateSpeed(val) {
+            animationSpeed = parseInt(val);
+            document.getElementById('speedValue').innerText = animationSpeed + 'ms';
         }
     </script>
 </body>
+
 </html>
