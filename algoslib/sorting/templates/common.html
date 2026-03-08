@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>bubble_sort</title>
-    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 
     <style>
         body {
@@ -20,8 +19,45 @@
         }
 
         h1 {
-            color: #89b4fa;
-            margin-bottom: 10px;
+            font-weight: bold;
+            font-size: 1.8em;
+            margin: 0 0 8px 0;
+            color: #b2c9ee;
+            line-height: 1.5;
+        }
+
+        .header-box {
+            width: 90%;
+            max-width: 1000px;
+            background: #2b2b40;
+            border: 2px solid #45475a;
+            border-radius: 12px;
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        .header-title {
+            font-weight: bold;
+            font-size: 1.8em;
+            margin: 0 0 8px 0;
+            color: #b2c9ee;
+            line-height: 1.5;
+        }
+
+        .header-desc {
+            font-size: 1.3em;
+            margin: 0 0 6px 0;
+            color: #b2c9ee;
+            line-height: 1.2;
+        }
+
+        .header-time {
+            font-size: 1.3em;
+            margin: 0 0 6px 0;
+            color: #b2c9ee;
+            line-height: 1.2;
         }
 
         .container {
@@ -35,9 +71,46 @@
 
         #plot {
             width: 100%;
-            height: 450px;
+            min-height: 120px;
             background: #181825;
             border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 20px;
+            flex-wrap: wrap;
+            box-sizing: border-box;
+        }
+
+        .cell {
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+            border-radius: 8px;
+            border: 2px solid #1e1e2e;
+            transition: all 0.15s ease;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .cell.blue {
+            /* background: #89b4fa; */
+            background: #b2c9ee;
+            color: #1e1e2e;
+        }
+
+        .cell.red {
+            background: #f38ba8;
+            color: #1e1e2e;
+        }
+
+        .cell.green {
+            background: #a6e3a1;
+            color: #1e1e2e;
         }
 
         .controls {
@@ -71,7 +144,8 @@
         }
 
         button.primary {
-            background: #89b4fa;
+            /* background: #89b4fa; */
+            background: #b2c9ee;
             color: #1e1e2e;
         }
 
@@ -83,7 +157,7 @@
             margin-top: 15px;
             text-align: center;
             font-family: 'Courier New', monospace;
-            color: #a6e3a1;
+            color: #89b4fa;
             font-size: 1.1em;
             min-height: 1.5em;
         }
@@ -104,6 +178,12 @@
 
 <body>
 
+    <div class="header-box">
+        <div class="header-title">Bubble Sort</div>
+        <div class="header-desc">Последовательно сравнивает соседние элементы и меняет их местами</div>
+        <div class="header-time" id="execTime">Время: O(n^2)</div>
+    </div>
+
     <div class="container">
         <h1>Bubble Sort</h1>
 
@@ -111,7 +191,7 @@
 
         <div class="controls">
             <button onclick="prevStep()">⏪ Назад</button>
-            <button class="primary" id="playBtn" onclick="togglePlay()">▶ Старт</button>
+            <button class="primary" id="playBtn" onclick="togglePlay()">▶️ Старт</button>
             <button onclick="nextStep()">Вперед ⏩</button>
 
             <div class="speed-control">
@@ -143,13 +223,11 @@
         }
 
         // === ЦВЕТА ===
-        function getColorArray(data, fst, snd, sortedCount) {
-            return data.map((_, i) => {
-                if (sortedCount >= data.length) return '#a6e3a1';
-                if (i === fst || i === snd) return '#f38ba8';  // красные
-                if (sortedCount > 0 && i >= data.length - sortedCount) return '#a6e3a1';  // зелёные
-                return '#89b4fa';  // синие
-            });
+        function getColorClass(data, fst, snd, sortedCount, idx) {
+            if (sortedCount >= data.length) return 'green';
+            if (idx === fst || idx === snd) return 'red';
+            if (sortedCount > 0 && idx >= data.length - sortedCount) return 'green';
+            return 'blue';
         }
 
         // === ИНИЦИАЛИЗАЦИЯ ===
@@ -158,86 +236,37 @@
         let timer = null;
         let animationSpeed = 300;
 
-        const initialData = getCurrentData(0);
-        const firstStep = history[0];
-
-        const trace = {
-            x: initialData.map((_, i) => i),
-            y: initialData,
-            type: 'bar',
-            marker: {
-                color: getColorArray(initialData, firstStep.fst, firstStep.snd, firstStep.sorted),
-                line: { color: '#1e1e2e', width: 2 }
-            },
-            transition: { duration: animationSpeed }
-        };
-
-        function getNiceYTicks(minVal, maxVal) {
-            const ticks = [];
-            for (let v = Math.floor(minVal); v <= Math.ceil(maxVal); v++) {
-                ticks.push(v);
-            }
-            return ticks;
+        function renderCells(data, fst, snd, sortedCount) {
+            const plot = document.getElementById('plot');
+            plot.innerHTML = '';
+            data.forEach((val, i) => {
+                const cell = document.createElement('div');
+                cell.className = `cell ${getColorClass(data, fst, snd, sortedCount, i)}`;
+                cell.textContent = val;
+                cell.style.transition = `background-color ${animationSpeed}ms ease, transform ${animationSpeed}ms ease`;
+                plot.appendChild(cell);
+            });
         }
-        const yMin = Math.min(...initialData) - 1;
-        const yMax = Math.max(...initialData) + 1;
-        const yTicks = getNiceYTicks(yMin, yMax);
-
-        const layout = {
-            title: { text: 'Старт', font: { color: '#cdd6f4' } },
-            margin: { t: 40, b: 50, l: 50, r: 20 },
-            paper_bgcolor: '#181825',
-            plot_bgcolor: '#181825',
-            font: { color: '#cdd6f4', family: 'Segoe UI' },
-
-            xaxis: {
-                range: [-0.5, initialData.length - 0.5],
-                showgrid: false,
-                tickmode: 'linear',
-                dtick: 1,
-                tickcolor: '#cdd6f4',
-                tickfont: { color: '#cdd6f4', size: 10 }
-            },
-
-            yaxis: {
-                range: [yMin, yMax],
-                tickmode: 'array',
-                tickvals: yTicks,
-                tickformat: 'd',
-                gridcolor: '#313244',
-                zeroline: true,
-                zerolinecolor: '#666',
-                showticklabels: true,
-                tickcolor: '#cdd6f4',
-                tickfont: { color: '#cdd6f4', size: 11 }
-            },
-            showlegend: false,
-            hovermode: false
-        };
-
-        Plotly.newPlot('plot', [trace], layout, { responsive: true, displayModeBar: false });
 
         // === ОТРИСОВКА ===
         function updateGraph(idx) {
             const step = history[idx];
             const data = getCurrentData(idx);
-            const colors = getColorArray(data, step.fst, step.snd, step.sorted);
+            const fst = step.fst;
+            const snd = step.snd;
+            const sortedCount = step.sorted;
 
-            Plotly.react('plot', [{
-                y: data,
-                marker: { color: colors, line: { color: '#1e1e2e', width: 2 } },
-                type: 'bar',
-                transition: { duration: animationSpeed }
-            }], {
-                ...layout,
-                title: {
-                    text: `Шаг ${idx + 1}/${history.length} | ${idx === 0 ? 'СТАРТ' :
-                        idx === history.length - 1 ? 'ФИНИШ' :
-                            step.is_swap ? 'ОБМЕН' : 'СРАВНЕНИЕ'
-                        }`,
-                    font: { color: '#cdd6f4' }
+            const cells = document.querySelectorAll('.cell');
+            data.forEach((val, i) => {
+                if (cells[i]) {
+                    cells[i].textContent = val;
+                    cells[i].className = `cell ${getColorClass(data, fst, snd, sortedCount, i)}`;
+                    if (i === fst || i === snd) {
+                        cells[i].style.transform = 'scale(1.1)';
+                        setTimeout(() => { cells[i].style.transform = 'scale(1)'; }, animationSpeed);
+                    }
                 }
-            }, { responsive: true, displayModeBar: false });
+            });
 
             // Статус
             let msg = idx === 0
@@ -245,10 +274,18 @@
                 idx === history.length - 1
                     ? `Готово: [${data.join(', ')}]` :
                     step.is_swap
-                        ? `Обмен: ${step.fst}↔${step.snd}`
-                        : `Сравнение: ${step.fst} vs ${step.snd}`;
+                        ? `Обмен: ${step.fst} ↔ ${step.snd}`
+                        : `Сравнение: ${step.fst} и ${step.snd}`;
             document.getElementById('status').innerText = msg;
+
+            document.querySelector('h1').textContent = `Шаг ${idx + 1}/${history.length}`;
         }
+
+        // === ИНИЦИАЛИЗАЦИЯ ВИЗУАЛИЗАЦИИ ===
+        const initialData = getCurrentData(0);
+        const firstStep = history[0];
+        renderCells(initialData, firstStep.fst, firstStep.snd, firstStep.sorted);
+        updateGraph(0);
 
         // === УПРАВЛЕНИЕ ===
         function nextStep() {
@@ -286,13 +323,16 @@
             isPlaying = false;
             clearTimeout(timer);
             const btn = document.getElementById('playBtn');
-            btn.innerText = "▶ Старт";
+            btn.innerText = "▶️ Старт";
             btn.classList.add('primary');
         }
         // === СКОРОСТЬ ===
         function updateSpeed(val) {
             animationSpeed = parseInt(val);
             document.getElementById('speedValue').innerText = animationSpeed + 'ms';
+            document.querySelectorAll('.cell').forEach(cell => {
+                cell.style.transition = `background-color ${animationSpeed}ms ease, transform ${animationSpeed}ms ease`;
+            });
         }
     </script>
 </body>

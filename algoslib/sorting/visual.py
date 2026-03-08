@@ -12,7 +12,7 @@ def visual_bubble_sort(
         type_template: str = 'common'
     ) -> None:
 
-    MAX_SIZE = 50
+    MAX_SIZE = 15
     if len(data) > MAX_SIZE:
         data = data[:MAX_SIZE] 
 
