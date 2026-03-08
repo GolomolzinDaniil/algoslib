@@ -1,23 +1,340 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=s, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>bubble_sort</title>
-    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e2e;
+            color: #cdd6f4;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            font-weight: bold;
+            font-size: 1.8em;
+            margin: 0 0 8px 0;
+            color: #b2c9ee;
+            line-height: 1.5;
+        }
+
+        .header-box {
+            width: 90%;
+            max-width: 1000px;
+            background: #2b2b40;
+            border: 2px solid #45475a;
+            border-radius: 12px;
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        .header-title {
+            font-weight: bold;
+            font-size: 1.8em;
+            margin: 0 0 8px 0;
+            color: #b2c9ee;
+            line-height: 1.5;
+        }
+
+        .header-desc {
+            font-size: 1.3em;
+            margin: 0 0 6px 0;
+            color: #b2c9ee;
+            line-height: 1.2;
+        }
+
+        .header-time {
+            font-size: 1.3em;
+            margin: 0 0 6px 0;
+            color: #b2c9ee;
+            line-height: 1.2;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1000px;
+            background: #2b2b40;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        #plot {
+            width: 100%;
+            min-height: 120px;
+            background: #181825;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 20px;
+            flex-wrap: wrap;
+            box-sizing: border-box;
+        }
+
+        .cell {
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+            border-radius: 8px;
+            border: 2px solid #1e1e2e;
+            transition: all 0.15s ease;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .cell.blue {
+            /* background: #89b4fa; */
+            background: #b2c9ee;
+            color: #1e1e2e;
+        }
+
+        .cell.red {
+            background: #f38ba8;
+            color: #1e1e2e;
+        }
+
+        .cell.green {
+            background: #a6e3a1;
+            color: #1e1e2e;
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            align-items: center;
+        }
+
+        button {
+            background: #45475a;
+            color: #cdd6f4;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: bold;
+            min-width: 100px;
+        }
+
+        button:hover {
+            background: #585b70;
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.primary {
+            /* background: #89b4fa; */
+            background: #b2c9ee;
+            color: #1e1e2e;
+        }
+
+        button.primary:hover {
+            background: #b4befe;
+        }
+
+        #status {
+            margin-top: 15px;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+            color: #89b4fa;
+            font-size: 1.1em;
+            min-height: 1.5em;
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9em;
+            color: #a6adc8;
+        }
+
+        input[type=range] {
+            cursor: pointer;
+        }
+    </style>
 </head>
+
 <body>
 
-    <style></style>
+    <div class="header-box">
+        <div class="header-title">Bubble Sort</div>
+        <div class="header-desc">Последовательно сравнивает соседние элементы и меняет их местами</div>
+        <div class="header-time" id="execTime">Время: O(n^2)</div>
+    </div>
+
+    <div class="container">
+        <h1>Bubble Sort</h1>
+
+        <div id="plot"></div>
+
+        <div class="controls">
+            <button onclick="prevStep()">⏪ Назад</button>
+            <button class="primary" id="playBtn" onclick="togglePlay()">▶️ Старт</button>
+            <button onclick="nextStep()">Вперед ⏩</button>
+
+            <div class="speed-control">
+                <span>Скорость:</span>
+                <input type="range" id="speedRange" min="50" max="1000" value="300" step="50"
+                    oninput="updateSpeed(this.value)">
+                <span id="speedValue">300ms</span>
+            </div>
+        </div>
+
+        <div id="status">Готов к работе</div>
+    </div>
+
     <script>
+        // === ДАННЫЕ ===
+        const history = {{ history| safe }};
+        const initialArray = {{ initial_array| safe }};
 
-        // здесь происходит замена переменной
-        const history = {{history | safe}};
+        // === ВОССТАНОВЛЕНИЕ МАССИВА ===
+        function getCurrentData(stepIndex) {
+            let data = [...initialArray];
+            for (let i = 1; i <= stepIndex; i++) {
+                if (history[i].is_swap) {
+                    [data[history[i].fst], data[history[i].snd]] =
+                        [data[history[i].snd], data[history[i].fst]];
+                }
+            }
+            return data;
+        }
 
-        // ниже нужно реализовать функции для визуализации
-        function name(params) {
-            
+        // === ЦВЕТА ===
+        function getColorClass(data, fst, snd, sortedCount, idx) {
+            if (sortedCount >= data.length) return 'green';
+            if (idx === fst || idx === snd) return 'red';
+            if (sortedCount > 0 && idx >= data.length - sortedCount) return 'green';
+            return 'blue';
+        }
+
+        // === ИНИЦИАЛИЗАЦИЯ ===
+        let currentStep = 0;
+        let isPlaying = false;
+        let timer = null;
+        let animationSpeed = 300;
+
+        function renderCells(data, fst, snd, sortedCount) {
+            const plot = document.getElementById('plot');
+            plot.innerHTML = '';
+            data.forEach((val, i) => {
+                const cell = document.createElement('div');
+                cell.className = `cell ${getColorClass(data, fst, snd, sortedCount, i)}`;
+                cell.textContent = val;
+                cell.style.transition = `background-color ${animationSpeed}ms ease, transform ${animationSpeed}ms ease`;
+                plot.appendChild(cell);
+            });
+        }
+
+        // === ОТРИСОВКА ===
+        function updateGraph(idx) {
+            const step = history[idx];
+            const data = getCurrentData(idx);
+            const fst = step.fst;
+            const snd = step.snd;
+            const sortedCount = step.sorted;
+
+            const cells = document.querySelectorAll('.cell');
+            data.forEach((val, i) => {
+                if (cells[i]) {
+                    cells[i].textContent = val;
+                    cells[i].className = `cell ${getColorClass(data, fst, snd, sortedCount, i)}`;
+                    if (i === fst || i === snd) {
+                        cells[i].style.transform = 'scale(1.1)';
+                        setTimeout(() => { cells[i].style.transform = 'scale(1)'; }, animationSpeed);
+                    }
+                }
+            });
+
+            // Статус
+            let msg = idx === 0
+                ? `Старт: [${data.join(', ')}]` :
+                idx === history.length - 1
+                    ? `Готово: [${data.join(', ')}]` :
+                    step.is_swap
+                        ? `Обмен: ${step.fst} ↔ ${step.snd}`
+                        : `Сравнение: ${step.fst} и ${step.snd}`;
+            document.getElementById('status').innerText = msg;
+
+            document.querySelector('h1').textContent = `Шаг ${idx + 1}/${history.length}`;
+        }
+
+        // === ИНИЦИАЛИЗАЦИЯ ВИЗУАЛИЗАЦИИ ===
+        const initialData = getCurrentData(0);
+        const firstStep = history[0];
+        renderCells(initialData, firstStep.fst, firstStep.snd, firstStep.sorted);
+        updateGraph(0);
+
+        // === УПРАВЛЕНИЕ ===
+        function nextStep() {
+            if (currentStep < history.length - 1) {
+                currentStep++;
+                updateGraph(currentStep);
+            } else {
+                stopPlay();
+            }
+        }
+        function prevStep() {
+            if (currentStep > 0) {
+                currentStep--;
+                updateGraph(currentStep);
+                stopPlay();
+            }
+        }
+        function togglePlay() {
+            const btn = document.getElementById('playBtn');
+            if (isPlaying) { stopPlay(); }
+            else {
+                if (currentStep >= history.length - 1) currentStep = 0;
+                isPlaying = true;
+                btn.innerText = "⏸ Пауза";
+                btn.classList.remove('primary');
+                runLoop();
+            }
+        }
+        function runLoop() {
+            if (!isPlaying || currentStep >= history.length - 1) { stopPlay(); return; }
+            nextStep();
+            timer = setTimeout(runLoop, animationSpeed);
+        }
+        function stopPlay() {
+            isPlaying = false;
+            clearTimeout(timer);
+            const btn = document.getElementById('playBtn');
+            btn.innerText = "▶️ Старт";
+            btn.classList.add('primary');
+        }
+        // === СКОРОСТЬ ===
+        function updateSpeed(val) {
+            animationSpeed = parseInt(val);
+            document.getElementById('speedValue').innerText = animationSpeed + 'ms';
+            document.querySelectorAll('.cell').forEach(cell => {
+                cell.style.transition = `background-color ${animationSpeed}ms ease, transform ${animationSpeed}ms ease`;
+            });
         }
     </script>
 </body>
+
 </html>

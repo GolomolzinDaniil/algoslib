@@ -12,7 +12,12 @@ def visual_bubble_sort(
         type_template: str = 'common'
     ) -> None:
 
-    history = json.dumps(bubble_sort(data))
+    MAX_SIZE = 15
+    if len(data) > MAX_SIZE:
+        data = data[:MAX_SIZE] 
+
+    history = json.dumps(bubble_sort(data.copy()))
+    initial_array = json.dumps(data)
 
     current_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -23,7 +28,7 @@ def visual_bubble_sort(
 
     template = Template(template_str)
 
-    final_html = template.render(history=history)
+    final_html = template.render(history=history, initial_array=initial_array )
 
     with open(output_name, 'w', encoding='utf-8') as file:
         file.write(final_html)
