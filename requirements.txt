@@ -6,6 +6,11 @@ setuptools>=80.10.2
 
 # для визуализации
 matplotlib>=3.10.8
+Jinja2
+
+# веб-сервер
+fastapi>=0.115.0
+uvicorn>=0.30.0
 
 # тесты
 pytest>=8.0.0
