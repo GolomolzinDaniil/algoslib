@@ -45,3 +45,12 @@ struct Dijkstra_Step {
     std::vector<int> visited;
     std::vector<int> queue;
 };
+
+struct Ford_Step {
+    int iteration;
+    int edge_from;  // Исходная вершина ребра
+    int edge_to;    // Целевая вершина ребра
+    bool relaxed;   // Произошла ли релаксация
+    double new_distance;  // Новое расстояние до edge_to после релаксации (или -1 если не менялось)
+    std::unordered_map<int, double> distances;
+};
