@@ -123,3 +123,11 @@ async def run_my_algo(req: BFSRequest):
 ```bash
 python -m venv .venv && source .venv/bin/activate
 ```
+#### Для очистки (может решить проблему при комплиции)
+```bash
+rm -rf build/ dist/ *.egg-info
+find . -name "*.so" -delete
+find . -name "*.o" -delete
+```
+
+
