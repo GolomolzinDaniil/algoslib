@@ -1,10 +1,7 @@
 #include <cstdint>
-// #include <iostream>
-
-#include "../../lib/bindings/include/bind_func.hpp"
-#include "../../lib/sorting/include/bubble_sort.hpp"
-// #include "../../lib/sorting/include/sorting_utils.hpp"
-
+#include "sorting_utils.hpp"
+#include "bubble_sort.hpp"
+#include "selection_sort.hpp"
 
 
 PYBIND11_MODULE(sub_sorting, m) {
@@ -14,11 +11,20 @@ PYBIND11_MODULE(sub_sorting, m) {
     m.def(
         "bubble_sort",
         [](py::object obj) {
-            return type_dispatcher([](auto& arr) {
-                return bubble_sort(arr);
+            return type_dispatcher([](auto& vec) {
+                return bubble_sort(vec);
             }, obj);
         },
         py::arg("arr")
     );
 
+    m.def(
+        "selection_sort",
+        [](py::object obj) {
+            return type_dispatcher([](auto& vec) {
+                return selection_sort(vec);
+            }, obj);
+        },
+        py::arg("arr")
+    );
 };

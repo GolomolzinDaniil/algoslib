@@ -1,6 +1,8 @@
 from setuptools import setup, Extension
-import pybind11
 import sys
+
+import pybind11
+
 
 # ВСЕ ЗАВИСИТ ОТ ОС
 if sys.platform == 'win32':
@@ -15,13 +17,13 @@ extensions = [
 
     # sorting
     Extension(
-        name='algoslib.sorting.sub_sorting',  # from algoslib.sorting import *
+        name='algoslib.sorting.sub_sorting',
         sources=[
             'algoslib/sorting/sub_sorting.cpp',
         ],
         include_dirs=[
             pybind11.get_include(),
-            'algoslib/sorting/include/'
+            'lib/sorting/include/'
         ],
         language='c++',
         extra_compile_args=compile_flags,
@@ -30,7 +32,7 @@ extensions = [
 
     # graphs
     Extension(
-        name='algoslib.graphs.sub_graphs',  # from algoslib.graphs import *
+        name='algoslib.graphs.sub_graphs',
         sources=[
             'algoslib/graphs/sub_graphs.cpp',
             'lib/graphs/src/bfs.cpp',
@@ -52,6 +54,6 @@ setup(
     zip_safe=False,
     package_data={
         'algoslib.sorting': ['sub_sorting.pyi'],
-        'algoslib.graphs': ['sub_graphs.pyi']
+        'algoslib.graphs' : ['sub_graphs.pyi']
     },
 )
