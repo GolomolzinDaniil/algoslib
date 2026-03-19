@@ -1,6 +1,23 @@
 import { renderSortingCells, updateSortingStep } from './sorting-viz.js';
 import { renderGraph, updateGraphStep } from './graph-viz.js';
 
+const SORTING_META = {
+    bubble: {
+        title: "Bubble Sort",
+        desc: "Последовательно сравнивает соседние элементы и меняет их местами",
+        time: "Время: O(n²)",
+        memory: "Память: О(1)",
+        direction: "end"
+    },
+    selection: {
+        title: "Selection Sort",
+        desc: "Находит минимум и помещает его в начало неотсортированной части",
+        time: "Время: O(n²)",
+        memory: "Память: О(1)",
+        direction: "start"
+    }
+};
+
 document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -34,7 +51,6 @@ const graphPlayer = createPlayer('graph');
 
 let graphData = { nodes: [], edges: [], algorithm: 'bfs' };
 let sortData = { history: [], initialArray: [] };
-
 const sortPlot = document.getElementById('sort-plot');
 
 document.getElementById('sort-run').addEventListener('click', async () => {
@@ -67,18 +83,55 @@ document.getElementById('sort-run').addEventListener('click', async () => {
         sortPlayer.current = 0;
         stopPlayer(sortPlayer);
 
+        const meta = SORTING_META[algo] || {};
+        document.getElementById('sort-header').style.display = 'block';
+        document.getElementById('sort-title').textContent = meta.title || algo;
+        document.getElementById('sort-desc').textContent = meta.desc || '';
+        document.getElementById('sort-time').textContent = meta.time || '';
+        document.getElementById('sort-memory').textContent = meta.memory || '';
+
+        const direction = result.direction || meta.direction || 'end';
+
         sortPlayer.el.controls.style.display = 'flex';
-        renderSortingCells(sortPlot, result.initial_array,
-            result.history[0].fst, result.history[0].snd, result.history[0].sorted, sortPlayer.speed, result.direction);
+
+        renderSortingCells(
+            sortPlot,
+            result.initial_array,
+            result.history[0].fst,
+            result.history[0].snd,
+            result.history[0].sorted,
+            sortPlayer.speed,
+            direction
+        );
+
         sortPlayer.el.status.textContent = updateSortingStep(
-            sortPlot, sortData.history, sortData.initialArray, 0, sortPlayer.speed);
+            sortPlot,
+            sortData.history,
+            sortData.initialArray,
+            0,
+            sortPlayer.speed,
+            direction
+        );
+
     } catch (e) {
         sortPlayer.el.status.textContent = `Ошибка: ${e.message}`;
+        console.error(e);
     }
 });
 
 function renderSortStep(idx) {
-    const msg = updateSortingStep(sortPlot, sortData.history, sortData.initialArray, idx, sortPlayer.speed);
+    const algo = document.getElementById('sort-algo').value;
+    const meta = SORTING_META[algo] || {};
+    const direction = sortData.history[idx]?.direction || meta.direction || 'end';
+
+    const msg = updateSortingStep(
+        sortPlot,
+        sortData.history,
+        sortData.initialArray,
+        idx,
+        sortPlayer.speed,
+        direction
+    );
     sortPlayer.el.status.textContent = msg;
 }
 
