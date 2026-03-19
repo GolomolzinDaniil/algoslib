@@ -9,22 +9,38 @@ PYBIND11_MODULE(sub_sorting, m) {
     m.doc() = "C++ сортировки для python";
 
     m.def(
-        "bubble_sort",
-        [](py::object obj) {
-            return type_dispatcher([](auto& vec) {
-                return bubble_sort(vec);
-            }, obj);
-        },
-        py::arg("arr")
-    );
+        "bubble_sort_h",
+        [](const py::list& data) {
+            return get_history([](std::vector<int>& vec) {
+                return bubble_sort_h(vec);
+        }, data);
+    });
 
     m.def(
+        "selection_sort_h",
+        [](const py::list& data) {
+            return get_history([](std::vector<int>& vec) {
+                return selection_sort_h(vec);
+        }, data);
+    });
+
+
+
+
+    
+    m.def(
+        "bubble_sort",
+        [](const py::list& data) {
+            return get_sorted([](std::vector<int>& vec) {
+                return bubble_sort(vec);
+        }, data);
+    });
+    
+    m.def(
         "selection_sort",
-        [](py::object obj) {
-            return type_dispatcher([](auto& vec) {
+        [](const py::list& data) {
+            return get_sorted([](std::vector<int>& vec) {
                 return selection_sort(vec);
-            }, obj);
-        },
-        py::arg("arr")
-    );
+        }, data);
+    });
 };
