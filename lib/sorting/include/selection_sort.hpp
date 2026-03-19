@@ -11,14 +11,20 @@ struct Selection_step
 };
 
 template <typename T>
-std::vector<Selection_step> selection_sort(std::vector<T> &vec)
+std::vector<Selection_step> selection_sort_h(std::vector<T> &vec)
 {
     std::vector<Selection_step> history;
+
     history.push_back({0,0,false,0});
 
     const size_t size = vec.size();
+    if (size == 0) 
+    {
+        history.push_back({0, 0, false, 0});
+        return history;
+    }
+    
     size_t min_index;
-
     for (size_t i = 0; i < size - 1; i++)
     {
         min_index = i;
@@ -36,3 +42,26 @@ std::vector<Selection_step> selection_sort(std::vector<T> &vec)
     history.push_back({0,0,false,size});
     return history;
 };
+
+
+template<typename T>
+std::vector<T> selection_sort(std::vector<T>& arr)
+{
+    const size_t arr_size = arr.size();
+
+    if (arr_size == 0) return arr;
+
+    for (size_t i = 0; i < arr_size - 1; i++)
+    {   
+        size_t min_index = i;
+        for (size_t j = i + 1; j < arr_size; j++)
+        {
+            if (arr[j] < arr[min_index]) min_index = j;
+        }
+        if (min_index != i)
+        {
+            std::swap(arr[i], arr[min_index]);
+        }
+    }
+    return arr;
+}
