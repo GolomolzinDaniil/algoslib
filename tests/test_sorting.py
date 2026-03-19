@@ -1,6 +1,4 @@
 import pytest
-import numpy as np
-from numpy.random import randint, uniform
 
 from algoslib.sorting.sub_sorting import bubble_sort
 
@@ -36,4 +34,3 @@ def test_inversion_arr(func):
 def test_many_el_arr(func):
     arr = [4,1,7,3,5]
     assert func(arr) == sorted(arr)
-
