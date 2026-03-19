@@ -18,18 +18,18 @@ function createPlayer(prefix) {
         timer: null,
         speed: parseInt(document.getElementById(`${prefix}-speed`).value),
         el: {
-            prev:     document.getElementById(`${prefix}-prev`),
-            play:     document.getElementById(`${prefix}-play`),
-            next:     document.getElementById(`${prefix}-next`),
-            speed:    document.getElementById(`${prefix}-speed`),
+            prev: document.getElementById(`${prefix}-prev`),
+            play: document.getElementById(`${prefix}-play`),
+            next: document.getElementById(`${prefix}-next`),
+            speed: document.getElementById(`${prefix}-speed`),
             speedVal: document.getElementById(`${prefix}-speed-val`),
             controls: document.getElementById(`${prefix}-controls`),
-            status:   document.getElementById(`${prefix}-status`),
+            status: document.getElementById(`${prefix}-status`),
         },
     };
 }
 
-const sortPlayer  = createPlayer('sort');
+const sortPlayer = createPlayer('sort');
 const graphPlayer = createPlayer('graph');
 
 let graphData = { nodes: [], edges: [], algorithm: 'bfs' };
@@ -56,7 +56,7 @@ document.getElementById('sort-run').addEventListener('click', async () => {
         });
         if (!res.ok) {
             let msg = res.statusText;
-            try { const j = await res.json(); msg = j.detail || msg; } catch {}
+            try { const j = await res.json(); msg = j.detail || msg; } catch { }
             throw new Error(msg);
         }
         const result = await res.json();
@@ -69,7 +69,7 @@ document.getElementById('sort-run').addEventListener('click', async () => {
 
         sortPlayer.el.controls.style.display = 'flex';
         renderSortingCells(sortPlot, result.initial_array,
-            result.history[0].fst, result.history[0].snd, result.history[0].sorted, sortPlayer.speed);
+            result.history[0].fst, result.history[0].snd, result.history[0].sorted, sortPlayer.speed, result.direction);
         sortPlayer.el.status.textContent = updateSortingStep(
             sortPlot, sortData.history, sortData.initialArray, 0, sortPlayer.speed);
     } catch (e) {
@@ -82,7 +82,7 @@ function renderSortStep(idx) {
     sortPlayer.el.status.textContent = msg;
 }
 
-const graphSvg  = document.getElementById('graph-svg');
+const graphSvg = document.getElementById('graph-svg');
 const graphInfo = document.getElementById('graph-info');
 
 document.getElementById('graph-algo').addEventListener('change', (e) => {
@@ -140,7 +140,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
         });
         if (!res.ok) {
             let msg = res.statusText;
-            try { const j = await res.json(); msg = j.detail || msg; } catch {}
+            try { const j = await res.json(); msg = j.detail || msg; } catch { }
             throw new Error(msg);
         }
         const result = await res.json();

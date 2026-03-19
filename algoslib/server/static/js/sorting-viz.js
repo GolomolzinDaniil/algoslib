@@ -1,8 +1,8 @@
-export function renderSortingCells(container, data, fst, snd, sortedCount, speed) {
+export function renderSortingCells(container, data, fst, snd, sortedCount, speed, direction = 'end') {
     container.innerHTML = '';
     data.forEach((val, i) => {
         const cell = document.createElement('div');
-        cell.className = `cell ${getCellColor(data.length, fst, snd, sortedCount, i)}`;
+        cell.className = `cell ${getCellColor(data.length, fst, snd, sortedCount, i, direction)}`;
         cell.textContent = val;
         cell.style.transition = `all ${speed}ms ease`;
         container.appendChild(cell);
@@ -24,7 +24,7 @@ export function updateSortingStep(container, history, initialArray, stepIndex, s
         const cell = cells[i];
         if (!cell) return;
         cell.textContent = val;
-        cell.className = `cell ${getCellColor(data.length, fst, snd, sortedCount, i)}`;
+        cell.className = `cell ${getCellColor(data.length, fst, snd, sortedCount, i, step.direction || 'end')}`;
         if (i === fst || i === snd) {
             cell.style.transform = 'scale(1.15)';
             setTimeout(() => { cell.style.transform = 'scale(1)'; }, speed);
@@ -45,10 +45,15 @@ function reconstructArray(initial, history, upTo) {
     return data;
 }
 
-function getCellColor(len, fst, snd, sortedCount, idx) {
+function getCellColor(len, fst, snd, sortedCount, idx, direction = 'end') {
     if (sortedCount >= len) return 'green';
     if (idx === fst || idx === snd) return 'red';
-    if (sortedCount > 0 && idx >= len - sortedCount) return 'green';
+
+    if (direction === 'end') {
+        if (sortedCount > 0 && idx >= len - sortedCount) return 'green';
+    } else {
+        if (sortedCount > 0 && idx < sortedCount) return 'green';
+    }
     return 'blue';
 }
 
