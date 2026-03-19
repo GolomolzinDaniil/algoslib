@@ -1,9 +1,9 @@
 import pytest
 
-from algoslib.sorting.sub_sorting import bubble_sort
+from algoslib.sorting.sub_sorting import bubble_sort, selection_sort
 
 
-ALGORITHMS = [sorted, bubble_sort]
+ALGORITHMS = [sorted, bubble_sort, selection_sort]
 
 @pytest.mark.parametrize("func", ALGORITHMS)
 def test_zero_arr(func):
