@@ -11,7 +11,7 @@ struct Bubble_step
 };
 
 template <typename T>
-std::vector<Bubble_step> bubble_sort(std::vector<T> &vec)
+std::vector<Bubble_step> bubble_sort_h(std::vector<T> &vec)
 {
     std::vector<Bubble_step> history;
     history.push_back({0, 0, false, 0});
@@ -37,3 +37,25 @@ std::vector<Bubble_step> bubble_sort(std::vector<T> &vec)
     history.push_back({0, 0, false, size});
     return history;
 };
+
+
+template<typename T>
+std::vector<T> bubble_sort(std::vector<T> arr)
+{
+    size_t arr_size = arr.size();
+    
+    for (size_t i = 0; i < arr_size; i++)
+    {   
+        bool flag = false;
+        for (size_t j = 0; j < arr_size - 1 - i; j++)
+        {
+            if (arr[j] > arr[j+1])
+            {
+                std::swap(arr[j], arr[j+1]);
+                flag = true;
+            }
+        }
+        if (!flag) break;
+    }
+    return arr;
+}
