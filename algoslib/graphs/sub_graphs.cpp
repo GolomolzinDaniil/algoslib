@@ -4,6 +4,7 @@
 #include "bfs.hpp"
 #include "graph_utils.hpp"
 #include "dijkstra.hpp"
+#include "bellman_ford.hpp"
 
 namespace py = pybind11;
 
@@ -46,4 +47,24 @@ PYBIND11_MODULE(sub_graphs, m) {
           &dijkstra,
           py::arg("graph"), py::arg("start_node"),
           "Алгоритм Дейкстры. Возвращает список шагов (List[DijkstraStep])");
+
+    // Структура шага алгоритма Беллмана-Форда
+    py::class_<Ford_Step>(m, "Ford_Step")
+        .def_readonly("iteration", &Ford_Step::iteration, 
+                      "Номер итерации алгоритма (1..|V|-1, или |V| при обнаружении цикла)")
+        .def_readonly("edge_from", &Ford_Step::edge_from, 
+                      "Исходная вершина релаксируемого ребра")
+        .def_readonly("edge_to", &Ford_Step::edge_to, 
+                      "Целевая вершина релаксируемого ребра")
+        .def_readonly("relaxed", &Ford_Step::relaxed, 
+                      "Была ли выполнена релаксация на этом шаге (bool)")
+        .def_readonly("distances", &Ford_Step::distances, 
+                      "Словарь {node_id: текущее расстояние} (float)");
+
+    // Функция bellman_ford
+    m.def("bellman_ford", 
+          &bellman_ford,
+          py::arg("graph"), py::arg("start_node"),
+          "Алгоритм Беллмана-Форда. Возвращает список шагов (List[Ford_Step]). "
+          "Поддерживает рёбра с отрицательным весом.");
 }
