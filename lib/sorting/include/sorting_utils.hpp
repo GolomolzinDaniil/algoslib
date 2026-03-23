@@ -11,30 +11,13 @@
 
 namespace py = pybind11;
 
-template<typename T>
-std::vector<T> numpy2vector(const py::array& arr) {
-
-    if (arr.ndim() != 1) {
-        throw std::runtime_error("Expected 1D dimension, but passed " + std::to_string(arr.ndim()));
-    }
-    auto buf = arr.request();
-    T* ptr = static_cast<T*>(buf.ptr);
-
-    return std::vector<T>(ptr, ptr + buf.size);
+inline std::vector<int> list2vector(const py::list& list)
+{
+    return list.cast<std::vector<int>>();
 };
 
-template<typename T>
-py::array_t<T> vector2numpy(const std::vector<T>& vec) {
-
-    auto res = py::array_t<T>(vec.size());
-    auto buf = res.request();
-    T* ptr = static_cast<T*>(buf.ptr);
-    std::copy(vec.begin(), vec.end(), ptr);
-
-    return res;
-};
-
-inline py::list to_py(const std::vector<Bubble_step>& history) {
+inline py::list to_py(const std::vector<Bubble_step>& history)
+{
     py::list res;
     for (const auto& step : history) {
         res.append(
@@ -49,7 +32,8 @@ inline py::list to_py(const std::vector<Bubble_step>& history) {
     return res;
 };
 
-inline py::list to_py(const std::vector<Selection_step>& history) {
+inline py::list to_py(const std::vector<Selection_step>& history)
+{
     py::list res;
     for (const auto& step : history) {
         res.append(
@@ -64,52 +48,162 @@ inline py::list to_py(const std::vector<Selection_step>& history) {
     return res;
 };
 
-template<typename T, typename Func>
-auto select_type(Func&& func, const py::array& arr) {
-    auto vec = numpy2vector<T>(arr);
+template<typename Func>
+inline py::list get_history(Func&& func, const py::list& list)
+{
+    auto vec = list2vector(list);
     auto history = func(vec);
     return to_py(history);
-}
-
+};
 
 template<typename Func>
-py::list type_dispatcher(Func&& func, const py::object& obj) {
-
-    if (py::isinstance<py::array>(obj)) {
-
-        auto arr = py::cast<py::array>(obj);
-        auto dtype = arr.dtype();
-
-        // знаковые
-        if      (dtype.is(py::dtype::of<std::int8_t>()))   return select_type<std::int8_t>(func, arr);
-        else if (dtype.is(py::dtype::of<std::int16_t>()))  return select_type<std::int16_t>(func, arr);
-        else if (dtype.is(py::dtype::of<std::int32_t>()))  return select_type<std::int32_t>(func, arr);
-        else if (dtype.is(py::dtype::of<std::int64_t>()))  return select_type<std::int64_t>(func, arr);
-        // беззнаковые
-        else if(dtype.is(py::dtype::of<std::uint8_t>()))   return select_type<std::uint8_t>(func, arr);
-        else if (dtype.is(py::dtype::of<std::uint16_t>())) return select_type<std::uint16_t>(func, arr);
-        else if (dtype.is(py::dtype::of<std::uint32_t>())) return select_type<std::uint32_t>(func, arr);
-        else if (dtype.is(py::dtype::of<std::uint64_t>())) return select_type<std::uint64_t>(func, arr);
-        // с плавающей точкой
-        else if (dtype.is(py::dtype::of<float>()))         return select_type<float>(func, arr);
-        else if (dtype.is(py::dtype::of<double>()))        return select_type<double>(func, arr);
-        else throw std::invalid_argument("Unsupported type: " + py::str(dtype).cast<std::string>());
-    }
-    // иначе python объект
-    else if (
-        py::isinstance<py::list>(obj) || py::isinstance<py::tuple>(obj) ||
-        py::isinstance<py::frozenset>(obj) || py::isinstance<py::set>(obj)) {
-
-            std::cout << "For more type support, use np.array" << std::endl;
-            try {
-                auto vec = obj.cast<std::vector<int64_t>>();
-                return to_py(func(vec));  
-            } catch (...) {
-                auto vec = obj.cast<std::vector<double>>();
-                return to_py(func(vec));  
-            }
-    }
-    throw std::invalid_argument(
-        "The object of type '" + py::str(py::type(obj)).cast<std::string>() + "' is not supported. "
-        "Expected: [np.array, list, tuple, set, frozenset]");
+inline py::list get_sorted(Func&& func, const py::list& list)
+{
+    auto vec = list2vector(list);
+    auto sorted_vec = func(vec);
+    return py::cast(sorted_vec);
 };
+
+
+
+// template<typename T>
+// std::vector<T> object2vector(const py::object& obj)
+// {
+//     if (py::isinstance<py::array>(obj))
+//     {   
+//         auto arr = py::cast<py::array>(obj);
+//         if (arr.ndim() != 1) {
+//             throw std::runtime_error("Expected 1D dimension, but passed " + std::to_string(arr.ndim()));
+//         }
+//         auto buf = arr.request();
+//         T* ptr = static_cast<T*>(buf.ptr);
+//         return std::vector<T>(ptr, ptr + buf.size);        
+//     }
+//     else if (py::isinstance<py::list>(obj) || py::isinstance<py::tuple>(obj))
+//     {
+//         return obj.cast<std::vector<T>>();
+//     }
+//     throw std::invalid_argument("Unsupported object type for conversion to vector");
+// };
+
+// template<typename T>
+// py::object vector2object(const std::vector<T>& vec, bool use_np)
+// {
+//     if (use_np)
+//     {
+//         py::array_t<T> arr(vec.size());
+//         auto buf = arr.request();
+//         T* ptr = static_cast<T*>(buf.ptr);
+//         std::copy(vec.begin(), vec.end(), ptr);
+//         return arr;
+//     }
+//     else
+//     {
+//         return py::cast(vec);
+//     }
+// }
+
+
+
+// template<typename T, typename Func>
+// py::list get_history(Func&& func, const py::object& obj)
+// {
+//     auto vec = object2vector<T>(obj);
+//     return to_py(func(vec));
+// };
+
+
+// template<typename Func>
+// py::list type_dispatcher_h(Func&& func, const py::object& obj)
+// {
+//     // если np.array
+//     if (py::isinstance<py::array>(obj)) {
+
+//         auto arr = py::cast<py::array>(obj);
+//         auto dtype = arr.dtype();
+
+//         // знаковые
+//         if      (dtype.is(py::dtype::of<std::int8_t>()))   return get_history<std::int8_t>(func, arr);
+//         else if (dtype.is(py::dtype::of<std::int16_t>()))  return get_history<std::int16_t>(func, arr);
+//         else if (dtype.is(py::dtype::of<std::int32_t>()))  return get_history<std::int32_t>(func, arr);
+//         else if (dtype.is(py::dtype::of<std::int64_t>()))  return get_history<std::int64_t>(func, arr);
+//         // беззнаковые
+//         else if(dtype.is(py::dtype::of<std::uint8_t>()))   return get_history<std::uint8_t>(func, arr);
+//         else if (dtype.is(py::dtype::of<std::uint16_t>())) return get_history<std::uint16_t>(func, arr);
+//         else if (dtype.is(py::dtype::of<std::uint32_t>())) return get_history<std::uint32_t>(func, arr);
+//         else if (dtype.is(py::dtype::of<std::uint64_t>())) return get_history<std::uint64_t>(func, arr);
+//         // с плавающей точкой
+//         else if (dtype.is(py::dtype::of<float>()))         return get_history<float>(func, arr);
+//         else if (dtype.is(py::dtype::of<double>()))        return get_history<double>(func, arr);
+//         else throw std::invalid_argument("Unsupported type: " + py::str(dtype).cast<std::string>());
+//     }
+//     // иначе python объект
+//     else if (py::isinstance<py::list>(obj) || py::isinstance<py::tuple>(obj))
+//     {
+//         try {
+//             return get_history<std::int64_t>(func, obj);
+//         }
+//         catch (const py::cast_error&) {
+//             return get_history<double>(func, obj);  
+//         }
+//         catch (const std::exception& e) {
+//             throw py::type_error(std::string("Conversion failed: ") + e.what());
+//         }
+//     }
+//     // не поддерживаемая структура
+//     throw std::invalid_argument(
+//             "The object of type '" + py::str(py::type(obj)).cast<std::string>() + "' is not supported. "
+//             "Expected: [np.array, list, tuple, set, frozenset]");
+// };
+
+
+// template<typename T, typename Func>
+// py::object get_typed_arr(Func&& func, const py::object& arr, bool use_np=true)
+// {
+//     auto vec = object2vector<T>(arr);
+//     return vector2object<T>(func(vec), use_np);
+// };
+
+// template<typename Func>
+// py::object type_dispatcher(Func&& func, const py::object& obj)
+// {
+//     // если np.array
+//     if (py::isinstance<py::array>(obj)) {
+
+//         auto arr = py::cast<py::array>(obj);
+//         auto dtype = arr.dtype();
+
+//         // знаковые
+//         if      (dtype.is(py::dtype::of<std::int8_t>()))   return get_typed_arr<std::int8_t>(func, arr);
+//         else if (dtype.is(py::dtype::of<std::int16_t>()))  return get_typed_arr<std::int16_t>(func, arr);
+//         else if (dtype.is(py::dtype::of<std::int32_t>()))  return get_typed_arr<std::int32_t>(func, arr);
+//         else if (dtype.is(py::dtype::of<std::int64_t>()))  return get_typed_arr<std::int64_t>(func, arr);
+//         // беззнаковые
+//         else if (dtype.is(py::dtype::of<std::uint8_t>()))  return get_typed_arr<std::uint8_t>(func, arr);
+//         else if (dtype.is(py::dtype::of<std::uint16_t>())) return get_typed_arr<std::uint16_t>(func, arr);
+//         else if (dtype.is(py::dtype::of<std::uint32_t>())) return get_typed_arr<std::uint32_t>(func, arr);
+//         else if (dtype.is(py::dtype::of<std::uint64_t>())) return get_typed_arr<std::uint64_t>(func, arr);
+//         // с плавающей точкой
+//         else if (dtype.is(py::dtype::of<float>()))         return get_typed_arr<float>(func, arr);
+//         else if (dtype.is(py::dtype::of<double>()))        return get_typed_arr<double>(func, arr);
+//         // не поддерживаемый тип данных
+//         else throw std::invalid_argument("Unsupported type: " + py::str(dtype).cast<std::string>());
+//     }
+//     // иначе python объект
+//     else if (py::isinstance<py::list>(obj) || py::isinstance<py::tuple>(obj))
+//     {
+//         try{
+//             return get_typed_arr<std::int64_t>(func, obj, false);
+//         }
+//         catch (const py::cast_error&){
+//             return get_typed_arr<double>(func, obj, false);  
+//         }
+//         catch (const std::exception& e) {
+//             throw py::type_error(std::string("Conversion failed: ") + e.what());
+//         }
+//     }
+//     // не поддерживаемая структура
+//     throw std::invalid_argument(
+//         "The object of type '" + py::str(py::type(obj)).cast<std::string>() + "' is not supported. "
+//         "Expected: [np.array, list, tuple]");
+// };
