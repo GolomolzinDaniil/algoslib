@@ -69,7 +69,7 @@ document.getElementById('sort-run').addEventListener('click', async () => {
 
         sortPlayer.el.controls.style.display = 'flex';
         renderSortingCells(sortPlot, result.initial_array,
-            result.history[0].fst, result.history[0].snd, result.history[0].sorted, sortPlayer.speed);
+            result.history[0].compare_a, result.history[0].compare_b, result.history[0].sorted_num, sortPlayer.speed);
         sortPlayer.el.status.textContent = updateSortingStep(
             sortPlot, sortData.history, sortData.initialArray, 0, sortPlayer.speed);
     } catch (e) {
