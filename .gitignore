@@ -2,5 +2,6 @@
 .venv
 .vscode
 build
+.pytest_cache
 __pycache__
 *.so

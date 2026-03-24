@@ -2,6 +2,7 @@
 #include "sorting_utils.hpp"
 #include "bubble_sort.hpp"
 #include "selection_sort.hpp"
+#include "gnome_sort.hpp"
 
 
 PYBIND11_MODULE(sub_sorting, m) {
@@ -13,34 +14,48 @@ PYBIND11_MODULE(sub_sorting, m) {
         [](const py::list& data) {
             return get_history([](std::vector<int>& vec) {
                 return bubble_sort_h(vec);
-        }, data);
-    });
-
+            }, data);
+        }
+    );
     m.def(
         "selection_sort_h",
         [](const py::list& data) {
             return get_history([](std::vector<int>& vec) {
                 return selection_sort_h(vec);
-        }, data);
-    });
+            }, data);
+        }
+    );
+    m.def(
+        "gnome_sort_h",
+        [](const py::list& data) {
+            return get_history([](std::vector<int>& vec) {
+                return gnome_sort_h(vec);
+            }, data);
+        }
+    );
 
-
-
-
-    
     m.def(
         "bubble_sort",
         [](const py::list& data) {
             return get_sorted([](std::vector<int>& vec) {
                 return bubble_sort(vec);
-        }, data);
-    });
-    
+            }, data);
+        }
+    );
     m.def(
         "selection_sort",
         [](const py::list& data) {
             return get_sorted([](std::vector<int>& vec) {
                 return selection_sort(vec);
-        }, data);
-    });
+            }, data);
+        }
+    );
+    m.def(
+        "gnome_sort",
+        [](const py::list& data) {
+            return get_sorted([](std::vector<int>& vec) {
+                return gnome_sort(vec);
+            }, data);
+        }
+    );
 };

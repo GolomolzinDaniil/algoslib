@@ -97,9 +97,9 @@ document.getElementById('sort-run').addEventListener('click', async () => {
         renderSortingCells(
             sortPlot,
             result.initial_array,
-            result.history[0].fst,
-            result.history[0].snd,
-            result.history[0].sorted,
+            result.history[0].compare_a,
+            result.history[0].compare_b,
+            result.history[0].sorted_num,
             sortPlayer.speed,
             direction
         );

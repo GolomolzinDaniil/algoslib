@@ -1,6 +1,6 @@
-export function getCellColor(len, fst, snd, sortedCount, idx, direction = 'end') {
+export function getCellColor(len, compare_a, compare_b, sortedCount, idx, direction = 'end') {
     if (sortedCount >= len) return 'green';
-    if (idx === fst || idx === snd) return 'red';
+    if (idx === compare_a || idx === compare_b) return 'red';
 
     if (sortedCount > 0) {
         if (direction === 'end') {
@@ -12,11 +12,11 @@ export function getCellColor(len, fst, snd, sortedCount, idx, direction = 'end')
     return 'blue';
 }
 
-export function renderSortingCells(container, data, fst, snd, sortedCount, speed, direction = 'end') {
+export function renderSortingCells(container, data, compare_a, compare_b, sortedCount, speed, direction = 'end') {
     container.innerHTML = '';
     data.forEach((val, i) => {
         const cell = document.createElement('div');
-        cell.className = `cell ${getCellColor(data.length, fst, snd, sortedCount, i, direction)}`;
+        cell.className = `cell ${getCellColor(data.length, compare_a, compare_b, sortedCount, i, direction)}`;
         cell.textContent = val;
         cell.style.transition = `all ${speed}ms ease`;
         container.appendChild(cell);
@@ -26,11 +26,11 @@ export function renderSortingCells(container, data, fst, snd, sortedCount, speed
 export function updateSortingStep(container, history, initialArray, stepIndex, speed, direction = 'end') {
     const step = history[stepIndex];
     const data = reconstructArray(initialArray, history, stepIndex);
-    const { fst, snd, sorted: sortedCount } = step;
+    const { compare_a, compare_b, sorted_num: sortedCount } = step;
 
     const cells = container.querySelectorAll('.cell');
     if (cells.length === 0) {
-        renderSortingCells(container, data, fst, snd, sortedCount, speed, direction);
+        renderSortingCells(container, data, compare_a, compare_b, sortedCount, speed, direction);
         return formatStatus(data, step, stepIndex, history.length);
     }
 
@@ -38,9 +38,9 @@ export function updateSortingStep(container, history, initialArray, stepIndex, s
         const cell = cells[i];
         if (!cell) return;
         cell.textContent = val;
-        cell.className = `cell ${getCellColor(data.length, fst, snd, sortedCount, i, direction)}`;
+        cell.className = `cell ${getCellColor(data.length, compare_a, compare_b, sortedCount, i, direction)}`;
 
-        if (i === fst || i === snd) {
+        if (i === compare_a || i === compare_b) {
             cell.style.transform = 'scale(1.1)';
             setTimeout(() => { cell.style.transform = 'scale(1)'; }, speed);
         }
@@ -53,8 +53,8 @@ function reconstructArray(initial, history, upTo) {
     const data = [...initial];
     for (let i = 1; i <= upTo; i++) {
         if (history[i].is_swap) {
-            [data[history[i].fst], data[history[i].snd]] =
-                [data[history[i].snd], data[history[i].fst]];
+            [data[history[i].compare_a], data[history[i].compare_b]] =
+                [data[history[i].compare_b], data[history[i].compare_a]];
         }
     }
     return data;
@@ -66,8 +66,8 @@ export function formatStatus(data, step, idx, total) {
     } else if (idx === total - 1) {
         return `✅ Готово: [${data.join(', ')}]`;
     } else if (step.is_swap) {
-        return `🔄 Обмен: ${step.fst} ↔ ${step.snd}`;
+        return `🔄 Обмен: ${step.compare_a} ↔ ${step.compare_b}`;
     } else {
-        return `🔍 Сравнение: ${step.fst} и ${step.snd}`;
+        return `🔍 Сравнение: ${step.compare_a} и ${step.compare_b}`;
     }
 }

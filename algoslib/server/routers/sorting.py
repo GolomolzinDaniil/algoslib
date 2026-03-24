@@ -1,11 +1,11 @@
 import traceback
 
-import numpy as np
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from algoslib.sorting.sub_sorting import bubble_sort, selection_sort
+from algoslib.sorting.sub_sorting import bubble_sort_h, selection_sort_h
+
 
 router = APIRouter()
 
@@ -19,17 +19,17 @@ class SortRequest(BaseModel):
 def normalize_sort_step(step: dict, algo: str) -> dict:
     if algo == "bubble":
         return {
-            "fst": step.get("compare_a", step.get("fst", 0)),
-            "snd": step.get("compare_b", step.get("snd", 0)),
+            "compare_a": step.get("compare_a", step.get("compare_a", 0)),
+            "compare_b": step.get("compare_b", step.get("compare_b", 0)),
             "is_swap": step.get("is_swap", False),
-            "sorted": step.get("sorted_num", step.get("sorted", 0))
+            "sorted_num": step.get("sorted_num", step.get("sorted_num", 0))
         }
     elif algo == "selection":
         return {
-            "fst": step.get("curr_ind", step.get("fst", 0)),
-            "snd": step.get("min_index", step.get("snd", 0)),
+            "compare_a": step.get("curr_ind", step.get("compare_a", 0)),
+            "compare_b": step.get("min_index", step.get("compare_b", 0)),
             "is_swap": step.get("is_swap", False),
-            "sorted": step.get("sorted_num", step.get("sorted", 0))
+            "sorted_num": step.get("sorted_num", step.get("sorted_num", 0))
         }
     return step
 
@@ -38,16 +38,16 @@ def normalize_sort_step(step: dict, algo: str) -> dict:
 async def run_bubble_sort(req: SortRequest):
     try:
         data = list(req.data[:MAX_SIZE])
-        arr = np.array(data)
-        raw_history = bubble_sort(arr)
+        arr = list(data)
+        raw_history = bubble_sort_h(arr)
 
         history = [normalize_sort_step(dict(s), algo="bubble") for s in raw_history]
 
         # Ensure initial and final steps exist (old .pyd may omit them)
-        if not history or history[0].get("snd", 1) != 0:
-            history.insert(0, {"fst": 0, "snd": 0, "is_swap": False, "sorted": 0})
-        if not history or history[-1].get("sorted", 0) != len(data):
-            history.append({"fst": 0, "snd": 0, "is_swap": False, "sorted": len(data)})
+        if not history or history[0].get("compare_b", 1) != 0:
+            history.insert(0, {"compare_a": 0, "compare_b": 0, "is_swap": False, "sorted_num": 0})
+        if not history or history[-1].get("sorted_num", 0) != len(data):
+            history.append({"compare_a": 0, "compare_b": 0, "is_swap": False, "sorted_num": len(data)})
 
         return {"history": history, "initial_array": data, "direction": "end", "algo": "bubble"}
     except Exception as e:
@@ -58,15 +58,15 @@ async def run_bubble_sort(req: SortRequest):
 async def run_selection_sort(req: SortRequest):
     try:
         data = list(req.data[:MAX_SIZE])
-        arr = np.array(data)
-        raw_history = selection_sort(arr)
+        arr = list(data)
+        raw_history = selection_sort_h(arr)
 
         history = [normalize_sort_step(dict(s), algo="selection") for s in raw_history]
 
-        if not history or history[0].get("sorted", 1) != 0:
-            history.insert(0, {"fst": 0, "snd": 0, "is_swap": False, "sorted": 0})
-        if not history or history[-1].get("sorted", 0) != len(data):
-            history.append({"fst": 0, "snd": 0, "is_swap": False, "sorted": len(data)})
+        if not history or history[0].get("sorted_num", 1) != 0:
+            history.insert(0, {"compare_a": 0, "compare_b": 0, "is_swap": False, "sorted_num": 0})
+        if not history or history[-1].get("sorted_num", 0) != len(data):
+            history.append({"compare_a": 0, "compare_b": 0, "is_swap": False, "sorted_num": len(data)})
 
         return {"history": history, "initial_array": data, "direction": "start", "algo": "selection"}
     except Exception as e:
