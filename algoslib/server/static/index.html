@@ -1,14 +1,17 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>algoslib</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
+
 <body>
 
     <nav class="tabs">
@@ -23,11 +26,20 @@
     </nav>
 
     <section id="sorting" class="page active">
+
+        <div class="sorting-header" id="sort-header" style="display:none">
+            <div class="sorting-header-title" id="sort-title">Bubble Sort</div>
+            <div class="sorting-header-desc" id="sort-desc">Описание...</div>
+            <div class="sorting-header-time" id="sort-time">Время: O(n²)</div>
+            <div class="sorting-header-memory" id="sort-memory">Память: O(1)</div>
+        </div>
+
         <div class="input-panel">
             <div class="input-row">
                 <label>Алгоритм:</label>
                 <select id="sort-algo">
                     <option value="bubble">Bubble Sort</option>
+                    <option value="selection">Selection Sort</option>
                 </select>
             </div>
             <div class="input-row">
@@ -135,4 +147,5 @@
     <script>lucide.createIcons();</script>
     <script type="module" src="/static/js/app.js"></script>
 </body>
+
 </html>

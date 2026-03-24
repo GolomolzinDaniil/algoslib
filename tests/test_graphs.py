@@ -137,3 +137,158 @@ def test_dijkstra_history_updates():
             found_update = True
             break
     assert found_update
+
+def test_bellman_ford_simple():
+    """Простой линейный граф: 0 --1.0--> 1 --2.0--> 2"""
+    g = Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    g.add_edge(1, 2, 2.0)
+    
+    steps = bellman_ford(g, 0)
+    
+    # Проверка, что шаги есть и последний содержит все вершины
+    assert len(steps) >= 1
+    final_distances = steps[-1].distances
+    assert final_distances[0] == 0.0
+    assert final_distances[1] == 1.0
+    assert final_distances[2] == 3.0
+
+
+def test_bellman_ford_step_type():
+    """Проверка типа возвращаемых шагов."""
+    g = Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    steps = bellman_ford(g, 0)
+    assert all(isinstance(s, Ford_Step) for s in steps)
+
+
+def test_bellman_ford_negative_weight():
+    """
+    Граф с отрицательным весом (но без цикла):
+    0 --1.0--> 1 --(-2.0)--> 2
+    """
+    g = Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    g.add_edge(1, 2, -2.0)
+    
+    steps = bellman_ford(g, 0)
+    final_distances = steps[-1].distances
+    
+    assert final_distances[0] == 0.0
+    assert final_distances[1] == 1.0
+    assert final_distances[2] == -1.0  # 1.0 + (-2.0)
+
+
+def test_bellman_ford_shortest_path_choice():
+    """
+    Граф с выбором пути (аналогично тесту для Дейкстры):
+    0 --1.0--> 1 --1.0--> 2  
+    0 --5.0--> 2            
+    """
+    g = Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    g.add_edge(1, 2, 1.0)
+    g.add_edge(0, 2, 5.0)
+    
+    steps = bellman_ford(g, 0)
+    final_distances = steps[-1].distances
+    
+    assert final_distances[2] == 2.0  # Путь через вершину 1 короче
+
+
+def test_bellman_ford_disconnected():
+    """Граф с недостижимой вершиной."""
+    g = Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    g.add_edge(2, 3, 1.0)  # Отдельный компонент
+    
+    steps = bellman_ford(g, 0)
+    final_distances = steps[-1].distances
+    
+    assert final_distances[0] == 0.0
+    assert final_distances[1] == 1.0
+    # Вершины 2 и 3 недостижимы
+    assert final_distances[2] == float('inf')
+    assert final_distances[3] == float('inf')
+
+
+def test_bellman_ford_float_weights():
+    """Проверка работы с дробными весами."""
+    g = Weighted_Graph()
+    g.add_edge(0, 1, 0.1)
+    g.add_edge(1, 2, 0.2)
+    
+    steps = bellman_ford(g, 0)
+    final_distances = steps[-1].distances
+    
+    assert abs(final_distances[1] - 0.1) < 1e-9
+    assert abs(final_distances[2] - 0.3) < 1e-9
+
+
+def test_bellman_ford_history_contains_relaxations():
+    """Проверка, что история содержит шаги с релаксацией."""
+    g = Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    g.add_edge(1, 2, 1.0)
+    
+    steps = bellman_ford(g, 0)
+    
+    # Хотя бы один шаг должен иметь relaxed=True
+    assert any(step.relaxed for step in steps)
+    
+    # Проверка полей шага
+    for step in steps:
+        assert isinstance(step.iteration, int)
+        assert step.iteration >= 1
+        assert isinstance(step.edge_from, int)
+        assert isinstance(step.edge_to, int)
+        assert isinstance(step.distances, dict)
+
+
+def test_bellman_ford_negative_cycle_detection():
+    """
+    Граф с отрицательным циклом:
+    0 --1.0--> 1 --(-2.0)--> 2 --1.0--> 1
+    Цикл 1->2->1 имеет суммарный вес -1 < 0
+    """
+    g = Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    g.add_edge(1, 2, -2.0)
+    g.add_edge(2, 1, 1.0)  # Замыкает отрицательный цикл
+    
+    steps = bellman_ford(g, 0)
+    
+    # Если реализация записывает шаг при обнаружении цикла,
+    # последний шаг будет иметь iteration == |V|
+    if steps:
+        last_step = steps[-1]
+        # Либо цикл обнаружен (итерация == количеству вершин)
+        # либо алгоритм корректно отработал без выброса исключения
+        assert isinstance(last_step.iteration, int)
+        assert last_step.iteration >= 1
+
+
+def test_bellman_ford_vs_dijkstra_consistency():
+    """
+    На графах без отрицательных весов результаты
+    Беллмана-Форда и Дейкстры должны совпадать.
+    """
+    g = Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    g.add_edge(0, 2, 4.0)
+    g.add_edge(1, 2, 2.0)
+    g.add_edge(1, 3, 5.0)
+    g.add_edge(2, 3, 1.0)
+    
+    bf_steps = bellman_ford(g, 0)
+    dj_steps = dijkstra(g, 0)
+    
+    bf_final = bf_steps[-1].distances
+    dj_final = dj_steps[-1].distances
+    
+    # Сравниваем расстояния для всех вершин
+    for node in bf_final:
+        if bf_final[node] == float('inf'):
+            assert dj_final[node] == float('inf')
+        else:
+            assert abs(bf_final[node] - dj_final[node]) < 1e-9

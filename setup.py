@@ -36,7 +36,8 @@ extensions = [
         sources=[
             'algoslib/graphs/sub_graphs.cpp',
             'lib/graphs/src/bfs.cpp',
-            'lib/graphs/src/dijkstra.cpp'
+            'lib/graphs/src/dijkstra.cpp',
+            'lib/graphs/src/bellman_ford.cpp'
         ],
         include_dirs=[
             pybind11.get_include(),

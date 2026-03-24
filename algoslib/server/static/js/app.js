@@ -1,6 +1,23 @@
 import { renderSortingCells, updateSortingStep } from './sorting-viz.js';
 import { renderGraph, updateGraphStep } from './graph-viz.js';
 
+const SORTING_META = {
+    bubble: {
+        title: "Bubble Sort",
+        desc: "Последовательно сравнивает соседние элементы и меняет их местами",
+        time: "Время: O(n²)",
+        memory: "Память: О(1)",
+        direction: "end"
+    },
+    selection: {
+        title: "Selection Sort",
+        desc: "Находит минимум и помещает его в начало неотсортированной части",
+        time: "Время: O(n²)",
+        memory: "Память: О(1)",
+        direction: "start"
+    }
+};
+
 document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -18,23 +35,22 @@ function createPlayer(prefix) {
         timer: null,
         speed: parseInt(document.getElementById(`${prefix}-speed`).value),
         el: {
-            prev:     document.getElementById(`${prefix}-prev`),
-            play:     document.getElementById(`${prefix}-play`),
-            next:     document.getElementById(`${prefix}-next`),
-            speed:    document.getElementById(`${prefix}-speed`),
+            prev: document.getElementById(`${prefix}-prev`),
+            play: document.getElementById(`${prefix}-play`),
+            next: document.getElementById(`${prefix}-next`),
+            speed: document.getElementById(`${prefix}-speed`),
             speedVal: document.getElementById(`${prefix}-speed-val`),
             controls: document.getElementById(`${prefix}-controls`),
-            status:   document.getElementById(`${prefix}-status`),
+            status: document.getElementById(`${prefix}-status`),
         },
     };
 }
 
-const sortPlayer  = createPlayer('sort');
+const sortPlayer = createPlayer('sort');
 const graphPlayer = createPlayer('graph');
 
 let graphData = { nodes: [], edges: [], algorithm: 'bfs' };
 let sortData = { history: [], initialArray: [] };
-
 const sortPlot = document.getElementById('sort-plot');
 
 document.getElementById('sort-run').addEventListener('click', async () => {
@@ -56,7 +72,7 @@ document.getElementById('sort-run').addEventListener('click', async () => {
         });
         if (!res.ok) {
             let msg = res.statusText;
-            try { const j = await res.json(); msg = j.detail || msg; } catch {}
+            try { const j = await res.json(); msg = j.detail || msg; } catch { }
             throw new Error(msg);
         }
         const result = await res.json();
@@ -67,22 +83,59 @@ document.getElementById('sort-run').addEventListener('click', async () => {
         sortPlayer.current = 0;
         stopPlayer(sortPlayer);
 
+        const meta = SORTING_META[algo] || {};
+        document.getElementById('sort-header').style.display = 'block';
+        document.getElementById('sort-title').textContent = meta.title || algo;
+        document.getElementById('sort-desc').textContent = meta.desc || '';
+        document.getElementById('sort-time').textContent = meta.time || '';
+        document.getElementById('sort-memory').textContent = meta.memory || '';
+
+        const direction = result.direction || meta.direction || 'end';
+
         sortPlayer.el.controls.style.display = 'flex';
-        renderSortingCells(sortPlot, result.initial_array,
-            result.history[0].compare_a, result.history[0].compare_b, result.history[0].sorted_num, sortPlayer.speed);
+
+        renderSortingCells(
+            sortPlot,
+            result.initial_array,
+            result.history[0].compare_a,
+            result.history[0].compare_b,
+            result.history[0].sorted_num,
+            sortPlayer.speed,
+            direction
+        );
+
         sortPlayer.el.status.textContent = updateSortingStep(
-            sortPlot, sortData.history, sortData.initialArray, 0, sortPlayer.speed);
+            sortPlot,
+            sortData.history,
+            sortData.initialArray,
+            0,
+            sortPlayer.speed,
+            direction
+        );
+
     } catch (e) {
         sortPlayer.el.status.textContent = `Ошибка: ${e.message}`;
+        console.error(e);
     }
 });
 
 function renderSortStep(idx) {
-    const msg = updateSortingStep(sortPlot, sortData.history, sortData.initialArray, idx, sortPlayer.speed);
+    const algo = document.getElementById('sort-algo').value;
+    const meta = SORTING_META[algo] || {};
+    const direction = sortData.history[idx]?.direction || meta.direction || 'end';
+
+    const msg = updateSortingStep(
+        sortPlot,
+        sortData.history,
+        sortData.initialArray,
+        idx,
+        sortPlayer.speed,
+        direction
+    );
     sortPlayer.el.status.textContent = msg;
 }
 
-const graphSvg  = document.getElementById('graph-svg');
+const graphSvg = document.getElementById('graph-svg');
 const graphInfo = document.getElementById('graph-info');
 
 document.getElementById('graph-algo').addEventListener('change', (e) => {
@@ -140,7 +193,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
         });
         if (!res.ok) {
             let msg = res.statusText;
-            try { const j = await res.json(); msg = j.detail || msg; } catch {}
+            try { const j = await res.json(); msg = j.detail || msg; } catch { }
             throw new Error(msg);
         }
         const result = await res.json();
