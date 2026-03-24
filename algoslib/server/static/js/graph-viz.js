@@ -5,6 +5,7 @@ const COLORS = {
     queue:       '#ce9178',
     defaultEdge: '#3e3e42',
     activeEdge:  '#f44747',
+    relaxedEdge: '#4ec9b0',
     nodeText:    '#1e1e1e',
     distText:    '#cccccc',
 };
@@ -15,24 +16,42 @@ let positions = {};
 
 export function renderGraph(svg, nodes, edges, weighted) {
     positions = circularLayout(nodes, 600, 400);
-    draw(svg, nodes, edges, weighted, {}, []);
+    // ← Исправлено: передаём null для activeEdge и relaxedEdge
+    draw(svg, nodes, edges, weighted, {}, [], null, null);
 }
 
 export function updateGraphStep(svg, nodes, edges, step, algorithm) {
-    const weighted = algorithm === 'dijkstra';
-    const visited = new Set(step.visited);
-    const inQueue = new Set(step.queue);
-    const current = step.current_node;
+    const weighted = algorithm === 'dijkstra' || algorithm === 'bellman_ford';
+    const visited = new Set(step.visited || []);
+    const inQueue = new Set(step.queue || []);
+    const current = step.current_node !== undefined ? step.current_node : null;
+
+    let activeEdge = null;
+    let relaxedEdge = null;
+    
+    if (algorithm === 'bellman_ford') {
+        activeEdge = [step.edge_from, step.edge_to];
+        if (step.relaxed) {
+            relaxedEdge = [step.edge_from, step.edge_to];
+        }
+    }
 
     const nodeColors = {};
     for (const n of nodes) {
-        if (n === current) nodeColors[n] = COLORS.current;
-        else if (visited.has(n)) nodeColors[n] = COLORS.visited;
-        else if (inQueue.has(n)) nodeColors[n] = COLORS.queue;
-        else nodeColors[n] = COLORS.defaultNode;
+        if (algorithm === 'bellman_ford') {
+            if (n === step.edge_from) nodeColors[n] = COLORS.current;
+            else if (visited.has(n)) nodeColors[n] = COLORS.visited;
+            else nodeColors[n] = COLORS.defaultNode;
+        } else {
+            if (n === current) nodeColors[n] = COLORS.current;
+            else if (visited.has(n)) nodeColors[n] = COLORS.visited;
+            else if (inQueue.has(n)) nodeColors[n] = COLORS.queue;
+            else nodeColors[n] = COLORS.defaultNode;
+        }
     }
 
-    draw(svg, nodes, edges, weighted, nodeColors, step.distances || {});
+    // ← Исправлено: явно передаём activeEdge и relaxedEdge
+    draw(svg, nodes, edges, weighted, nodeColors, step.distances || {}, activeEdge, relaxedEdge);
     return formatInfo(step, algorithm);
 }
 
@@ -47,7 +66,8 @@ function circularLayout(nodes, w, h) {
     return pos;
 }
 
-function draw(svg, nodes, edges, weighted, nodeColors, distances) {
+// ← Исправлено: явные параметры вместо default values
+function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, relaxedEdge) {
     let html = '';
 
     for (const edge of edges) {
@@ -55,9 +75,20 @@ function draw(svg, nodes, edges, weighted, nodeColors, distances) {
         const p1 = positions[u], p2 = positions[v];
         if (!p1 || !p2) continue;
 
-        const color = COLORS.defaultEdge;
+        let color = COLORS.defaultEdge;
+        let strokeWidth = 2.5;
+        
+        // ← Проверка на null перед доступом к свойствам
+        if (relaxedEdge && relaxedEdge[0] === u && relaxedEdge[1] === v) {
+            color = COLORS.relaxedEdge;
+            strokeWidth = 4;
+        } else if (activeEdge && activeEdge[0] === u && activeEdge[1] === v) {
+            color = COLORS.activeEdge;
+            strokeWidth = 4;
+        }
+
         html += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}"
-                       stroke="${color}" stroke-width="2.5" stroke-linecap="round"/>`;
+                       stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round"/>`;
 
         if (weighted && edge.length >= 3) {
             const mx = (p1.x + p2.x) / 2;
@@ -94,11 +125,18 @@ function draw(svg, nodes, edges, weighted, nodeColors, distances) {
 
 function formatInfo(step, algorithm) {
     const lines = [];
-    lines.push(`<span class="label">Вершина:</span> <span class="value">${step.current_node}</span>`);
-    lines.push(`<span class="label">Посещены:</span> <span class="value">[${step.visited.join(', ')}]</span>`);
-    lines.push(`<span class="label">Очередь:</span> <span class="value">[${step.queue.join(', ')}]</span>`);
+    
+    if (algorithm === 'bellman_ford') {
+        lines.push(`<span class="label">Итерация:</span> <span class="value">${step.iteration}</span>`);
+        lines.push(`<span class="label">Ребро:</span> <span class="value">${step.edge_from} → ${step.edge_to}</span>`);
+        lines.push(`<span class="label">Релаксация:</span> <span class="value">${step.relaxed ? '✓ Да' : '✗ Нет'}</span>`);
+    } else {
+        lines.push(`<span class="label">Вершина:</span> <span class="value">${step.current_node}</span>`);
+        lines.push(`<span class="label">Посещены:</span> <span class="value">[${(step.visited || []).join(', ')}]</span>`);
+        lines.push(`<span class="label">Очередь:</span> <span class="value">[${(step.queue || []).join(', ')}]</span>`);
+    }
 
-    if (algorithm === 'dijkstra' && step.distances) {
+    if ((algorithm === 'dijkstra' || algorithm === 'bellman_ford') && step.distances) {
         const dists = Object.entries(step.distances)
             .map(([k, v]) => `${k}:${v === null ? '∞' : v}`)
             .join(', ');
