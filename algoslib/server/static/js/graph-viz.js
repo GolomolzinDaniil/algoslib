@@ -16,7 +16,6 @@ let positions = {};
 
 export function renderGraph(svg, nodes, edges, weighted) {
     positions = circularLayout(nodes, 600, 400);
-    // ← Исправлено: передаём null для activeEdge и relaxedEdge
     draw(svg, nodes, edges, weighted, {}, [], null, null);
 }
 
@@ -49,8 +48,6 @@ export function updateGraphStep(svg, nodes, edges, step, algorithm) {
             else nodeColors[n] = COLORS.defaultNode;
         }
     }
-
-    // ← Исправлено: явно передаём activeEdge и relaxedEdge
     draw(svg, nodes, edges, weighted, nodeColors, step.distances || {}, activeEdge, relaxedEdge);
     return formatInfo(step, algorithm);
 }
@@ -66,7 +63,6 @@ function circularLayout(nodes, w, h) {
     return pos;
 }
 
-// ← Исправлено: явные параметры вместо default values
 function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, relaxedEdge) {
     let html = '';
 
@@ -77,8 +73,7 @@ function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, re
 
         let color = COLORS.defaultEdge;
         let strokeWidth = 2.5;
-        
-        // ← Проверка на null перед доступом к свойствам
+
         if (relaxedEdge && relaxedEdge[0] === u && relaxedEdge[1] === v) {
             color = COLORS.relaxedEdge;
             strokeWidth = 4;
