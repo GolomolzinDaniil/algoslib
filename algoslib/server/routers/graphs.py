@@ -18,6 +18,11 @@ class DijkstraRequest(BaseModel):
     start_node: int
 
 
+class BellmanFordRequest(BaseModel):
+    edges: list[list[float]]
+    start_node: int
+
+
 @router.post("/bfs")
 async def run_bfs(req: BFSRequest):
     try:
@@ -78,6 +83,50 @@ async def run_dijkstra(req: DijkstraRequest):
                 "distances": distances,
                 "visited": [int(x) for x in step.visited],
                 "queue": [int(x) for x in step.queue],
+            })
+
+        return {
+            "steps": result_steps,
+            "edges": req.edges,
+            "nodes": sorted(nodes),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
+@router.post("/bellman_ford")
+async def run_bellman_ford(req: BellmanFordRequest):
+    try:
+        from algoslib.graphs import Weighted_Graph, bellman_ford
+        if bellman_ford is None:
+            raise HTTPException(
+                status_code=501,
+                detail="Bellman-Ford не доступен — пересоберите sub_graphs",
+            )
+        graph = Weighted_Graph()
+        nodes = set()
+        for edge in req.edges:
+            u, v, w = int(edge[0]), int(edge[1]), edge[2]
+            graph.add_edge(u, v, w)
+            nodes.add(u)
+            nodes.add(v)
+
+        steps = bellman_ford(graph, req.start_node)
+
+        result_steps = []
+        for step in steps:
+            distances = {}
+            for node, dist in step.distances.items():
+                distances[str(node)] = None if math.isinf(dist) else float(dist)
+            result_steps.append({
+                "iteration": int(step.iteration),
+                "edge_from": int(step.edge_from),
+                "edge_to": int(step.edge_to),
+                "relaxed": bool(step.relaxed),
+                "distances": distances,
             })
 
         return {

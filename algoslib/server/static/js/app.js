@@ -140,10 +140,11 @@ const graphInfo = document.getElementById('graph-info');
 
 document.getElementById('graph-algo').addEventListener('change', (e) => {
     const label = document.getElementById('edges-label');
-    if (e.target.value === 'dijkstra') {
-        label.textContent = 'Рёбра (по одному на строку: u v вес):';
+    const algo = e.target.value;
+    if (algo === 'dijkstra' || algo === 'bellman_ford') {
+        label.textContent = 'Рёбра (по одному на строке: u v вес):';
     } else {
-        label.textContent = 'Рёбра (по одному на строку: u v):';
+        label.textContent = 'Рёбра (по одному на строке: u v):';
     }
 });
 
@@ -151,6 +152,8 @@ document.getElementById('graph-example').addEventListener('click', () => {
     const algo = document.getElementById('graph-algo').value;
     if (algo === 'dijkstra') {
         document.getElementById('graph-edges').value = '0 1 4\n0 2 1\n1 3 1\n2 1 2\n2 3 5\n3 4 3';
+    } else if (algo === 'bellman_ford') {
+        document.getElementById('graph-edges').value = '0 1 4\n0 2 5\n1 2 -3\n2 3 2\n3 1 1';
     } else {
         document.getElementById('graph-edges').value = '0 1\n0 2\n1 3\n2 3\n3 4\n4 5\n2 5';
     }
@@ -171,8 +174,10 @@ document.getElementById('graph-run').addEventListener('click', async () => {
     for (const line of rawEdges.split('\n')) {
         const parts = line.trim().split(/\s+/).map(Number);
         if (parts.some(isNaN)) continue;
-        if (algo === 'dijkstra' && parts.length >= 3) {
-            edges.push([parts[0], parts[1], parts[2]]);
+        if (algo === 'dijkstra' || algo === 'bellman_ford') {
+            if (parts.length >= 3) {
+                edges.push([parts[0], parts[1], parts[2]]);
+            }
         } else if (parts.length >= 2) {
             edges.push([parts[0], parts[1]]);
         }
@@ -193,7 +198,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
         });
         if (!res.ok) {
             let msg = res.statusText;
-            try { const j = await res.json(); msg = j.detail || msg; } catch { }
+            try { const j = await res.json(); msg = j.detail || msg; } catch {}
             throw new Error(msg);
         }
         const result = await res.json();
@@ -206,13 +211,12 @@ document.getElementById('graph-run').addEventListener('click', async () => {
         graphPlayer.el.controls.style.display = 'flex';
         graphInfo.style.display = 'block';
 
-        renderGraph(graphSvg, result.nodes, result.edges, algo === 'dijkstra');
+        renderGraph(graphSvg, result.nodes, result.edges, algo === 'dijkstra' || algo === 'bellman_ford');
         renderGraphStepAt(0);
     } catch (e) {
         graphPlayer.el.status.textContent = `Ошибка: ${e.message}`;
     }
 });
-
 function renderGraphStepAt(idx) {
     const step = graphPlayer.steps[idx];
     const info = updateGraphStep(graphSvg, graphData.nodes, graphData.edges, step, graphData.algorithm);
