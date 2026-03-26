@@ -4,7 +4,14 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from algoslib.sorting.sub_sorting import bubble_sort_h, selection_sort_h, gnome_sort_h
+from algoslib.sorting.sub_sorting import (
+    bubble_sort,
+    bubble_sort_h,
+    selection_sort,
+    selection_sort_h,
+    gnome_sort,
+    gnome_sort_h,
+)
 
 
 router = APIRouter()
@@ -14,6 +21,17 @@ MAX_SIZE = 15
 
 class SortRequest(BaseModel):
     data: list[float | int]
+
+
+def get_sorted_array(data: list[float | int], algo: str) -> list[float | int]:
+    data_copy = list(data)
+    if algo == "bubble":
+        return list(bubble_sort(data_copy))
+    if algo == "selection":
+        return list(selection_sort(data_copy))
+    if algo == "gnome":
+        return list(gnome_sort(data_copy))
+    return sorted(data_copy)
 
 
 def normalize_sort_step(step: dict, algo: str) -> dict:
@@ -56,7 +74,13 @@ async def run_bubble_sort(req: SortRequest):
         if not history or history[-1].get("sorted_num", 0) != len(data):
             history.append({"compare_a": 0, "compare_b": 0, "is_swap": False, "sorted_num": len(data)})
 
-        return {"history": history, "initial_array": data, "direction": "end", "algo": "bubble"}
+        return {
+            "history": history,
+            "initial_array": data,
+            "sorted_array": get_sorted_array(data, "bubble"),
+            "direction": "end",
+            "algo": "bubble"
+        }
     except Exception as e:
         traceback.print_exc()
         return JSONResponse(status_code=500, content={"detail": str(e)})
@@ -75,7 +99,13 @@ async def run_selection_sort(req: SortRequest):
         if not history or history[-1].get("sorted_num", 0) != len(data):
             history.append({"compare_a": 0, "compare_b": 0, "is_swap": False, "sorted_num": len(data)})
 
-        return {"history": history, "initial_array": data, "direction": "start", "algo": "selection"}
+        return {
+            "history": history,
+            "initial_array": data,
+            "sorted_array": get_sorted_array(data, "selection"),
+            "direction": "start",
+            "algo": "selection"
+        }
     except Exception as e:
         traceback.print_exc()
         return JSONResponse(status_code=500, content={"detail": str(e)})
@@ -95,6 +125,7 @@ async def run_gnome_sort(req: SortRequest):
         return {
             "history": history, 
             "initial_array": data, 
+            "sorted_array": get_sorted_array(data, "gnome"),
             "direction": "bidirectional",
             "algo": "gnome"
         }

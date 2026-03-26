@@ -24,6 +24,37 @@ const SORTING_META = {
         direction: "end"
     }
 };
+const MAX_SORT_ITEMS = 15;
+
+document.addEventListener('DOMContentLoaded', () => {
+    initSortingPage();
+    if (window.lucide) setTimeout(() => lucide.createIcons(), 100);
+});
+
+function initSortingPage() {
+    const header = document.getElementById('sort-header');
+    if (header) {
+        header.style.display = 'block';
+        document.getElementById('sort-title').textContent = '🔤 Сортировки';
+        document.getElementById('sort-desc').textContent = 'Выберите алгоритм и введите массив';
+        document.getElementById('sort-time').textContent = '';
+        document.getElementById('sort-memory').textContent = '';
+    }
+
+    const algoSelect = document.getElementById('sort-algo');
+    if (algoSelect) algoSelect.value = '';
+
+    const plot = document.getElementById('sort-plot');
+    if (plot) plot.innerHTML = '';
+
+    const status = document.getElementById('sort-status');
+    if (status) status.textContent = '';
+
+    const controls = document.getElementById('sort-controls');
+    if (controls) controls.style.display = 'none';
+
+    if (sortFileInput) sortFileInput.value = '';
+}
 
 document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -31,7 +62,32 @@ document.querySelectorAll('.tab').forEach(tab => {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         tab.classList.add('active');
         document.getElementById(tab.dataset.tab).classList.add('active');
+
+        if (tab.dataset.tab === 'sorting') {
+            initSortingPage();
+        }
     });
+});
+
+document.getElementById('sort-algo').addEventListener('change', (e) => {
+    const algo = e.target.value;
+    resetSortingSession();
+
+    if (algo && SORTING_META[algo]) {
+        const meta = SORTING_META[algo];
+        sortPlayer.el.controls.style.display = 'flex';
+        document.getElementById('sort-title').textContent = meta.title;
+        document.getElementById('sort-desc').textContent = meta.desc;
+        document.getElementById('sort-time').textContent = meta.time;
+        document.getElementById('sort-memory').textContent = meta.memory;
+        renderSortInputPreview();
+    } else {
+        sortPlayer.el.controls.style.display = 'none';
+        document.getElementById('sort-title').textContent = '🔤 Сортировки';
+        document.getElementById('sort-desc').textContent = 'Выберите алгоритм и введите массив';
+        document.getElementById('sort-time').textContent = '';
+        document.getElementById('sort-memory').textContent = '';
+    }
 });
 
 function createPlayer(prefix) {
@@ -57,73 +113,247 @@ const sortPlayer = createPlayer('sort');
 const graphPlayer = createPlayer('graph');
 
 let graphData = { nodes: [], edges: [], algorithm: 'bfs' };
-let sortData = { history: [], initialArray: [] };
+let sortData = { history: [], initialArray: [], sortedArray: [] };
 const sortPlot = document.getElementById('sort-plot');
+const sortDataInput = document.getElementById('sort-data');
+const sortFileInput = document.getElementById('sort-file');
+const sortDownloadFileBtn = document.getElementById('sort-download-file');
 
-document.getElementById('sort-run').addEventListener('click', async () => {
-    const raw = document.getElementById('sort-data').value;
-    const data = raw.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+function parseSortInput(raw) {
+    return raw
+        .split(/[\s,;]+/)
+        .map(part => parseFloat(part.trim()))
+        .filter(value => !Number.isNaN(value));
+}
+
+function renderSortInputPreview() {
+    if (!sortPlot) return;
+
+    const data = parseSortInput(sortDataInput.value);
     if (data.length === 0) {
-        sortPlayer.el.status.textContent = 'Введите числа через запятую';
+        sortPlot.innerHTML = '';
         return;
     }
 
     const algo = document.getElementById('sort-algo').value;
-    sortPlayer.el.status.textContent = 'Загрузка...';
+    const meta = SORTING_META[algo] || {};
+    const direction = meta.direction || 'end';
 
-    try {
-        const res = await fetch(`/api/sorting/${algo}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ data }),
-        });
-        if (!res.ok) {
-            let msg = res.statusText;
-            try { const j = await res.json(); msg = j.detail || msg; } catch { }
-            throw new Error(msg);
-        }
-        const result = await res.json();
+    renderSortingCells(sortPlot, data, -1, -1, 0, sortPlayer.speed, direction);
+}
 
-        sortData.history = result.history;
-        sortData.initialArray = result.initial_array;
-        sortPlayer.steps = result.history;
-        sortPlayer.current = 0;
-        stopPlayer(sortPlayer);
+function resetSortingSession() {
+    stopPlayer(sortPlayer);
+    sortPlayer.steps = [];
+    sortPlayer.current = 0;
+    sortData = { history: [], initialArray: [], sortedArray: [] };
+    if (sortPlot) sortPlot.innerHTML = '';
+    if (sortPlayer.el.status) sortPlayer.el.status.textContent = '';
+}
 
-        const meta = SORTING_META[algo] || {};
-        document.getElementById('sort-header').style.display = 'block';
-        document.getElementById('sort-title').textContent = meta.title || algo;
-        document.getElementById('sort-desc').textContent = meta.desc || '';
-        document.getElementById('sort-time').textContent = meta.time || '';
-        document.getElementById('sort-memory').textContent = meta.memory || '';
+function applySortingResult(result, algo) {
+    sortData.history = result.history || [];
+    sortData.initialArray = result.initial_array || [];
+    sortData.sortedArray = Array.isArray(result.sorted_array)
+        ? result.sorted_array
+        : [...sortData.initialArray].sort((a, b) => a - b);
+    sortPlayer.steps = sortData.history;
+    sortPlayer.current = 0;
 
-        const direction = result.direction || meta.direction || 'end';
+    const meta = SORTING_META[algo] || {};
+    document.getElementById('sort-title').textContent = meta.title || algo;
+    document.getElementById('sort-desc').textContent = meta.desc || '';
+    document.getElementById('sort-time').textContent = meta.time || '';
+    document.getElementById('sort-memory').textContent = meta.memory || '';
+    sortPlayer.el.controls.style.display = 'flex';
 
-        sortPlayer.el.controls.style.display = 'flex';
-
-        renderSortingCells(
-            sortPlot,
-            result.initial_array,
-            result.history[0].compare_a,
-            result.history[0].compare_b,
-            result.history[0].sorted_num,
-            sortPlayer.speed,
-            direction
-        );
-
-        sortPlayer.el.status.textContent = updateSortingStep(
-            sortPlot,
-            sortData.history,
-            sortData.initialArray,
-            0,
-            sortPlayer.speed,
-            direction
-        );
-
-    } catch (e) {
-        sortPlayer.el.status.textContent = `Ошибка: ${e.message}`;
-        console.error(e);
+    if (sortData.initialArray.length === 0 || sortData.history.length === 0) {
+        sortPlot.innerHTML = '';
+        sortPlayer.el.status.textContent = 'Нет данных для визуализации';
+        return;
     }
+
+    const direction = result.direction || meta.direction || 'end';
+    renderSortingCells(
+        sortPlot,
+        sortData.initialArray,
+        sortData.history[0]?.compare_a ?? 0,
+        sortData.history[0]?.compare_b ?? 0,
+        sortData.history[0]?.sorted_num ?? 0,
+        sortPlayer.speed,
+        direction
+    );
+
+    sortPlayer.el.status.textContent = updateSortingStep(
+        sortPlot,
+        sortData.history,
+        sortData.initialArray,
+        0,
+        sortPlayer.speed,
+        direction
+    );
+}
+
+if (sortDataInput) {
+    sortDataInput.addEventListener('input', (e) => {
+        const input = e.target;
+        const numbers = parseSortInput(input.value);
+        let isClamped = false;
+        if (numbers.length > MAX_SORT_ITEMS) {
+            input.value = numbers.slice(0, MAX_SORT_ITEMS).join(', ');
+            isClamped = true;
+        }
+
+        resetSortingSession();
+        renderSortInputPreview();
+        if (isClamped) {
+            sortPlayer.el.status.textContent = `Можно ввести максимум ${MAX_SORT_ITEMS} чисел`;
+        }
+    });
+}
+
+if (sortFileInput) {
+    sortFileInput.addEventListener('change', async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        try {
+            const text = await file.text();
+            const numbers = parseSortInput(text);
+            if (numbers.length === 0) {
+                throw new Error('Файл не содержит чисел');
+            }
+
+            const limitedNumbers = numbers.slice(0, MAX_SORT_ITEMS);
+            sortDataInput.value = limitedNumbers.join(', ');
+
+            resetSortingSession();
+            renderSortInputPreview();
+
+            if (numbers.length > MAX_SORT_ITEMS) {
+                sortPlayer.el.status.textContent =
+                    `В файле больше ${MAX_SORT_ITEMS} чисел, взяты первые ${MAX_SORT_ITEMS}`;
+            } else {
+                sortPlayer.el.status.textContent = `Файл ${file.name} загружен`;
+            }
+        } catch (error) {
+            sortPlayer.el.status.textContent = `Ошибка чтения файла: ${error.message}`;
+        }
+    });
+}
+
+if (sortDownloadFileBtn) {
+    sortDownloadFileBtn.addEventListener('click', async () => {
+        const algo = document.getElementById('sort-algo').value;
+        if (!algo) {
+            sortPlayer.el.status.textContent = 'Сначала выберите алгоритм сортировки';
+            return;
+        }
+
+        sortPlayer.el.status.textContent = 'Подготовка файла...';
+        try {
+            const result = await loadSortingData();
+            applySortingResult(result, algo);
+            stopPlayer(sortPlayer);
+
+            if (!sortData.sortedArray.length) {
+                throw new Error('Не удалось получить отсортированный массив');
+            }
+
+            const fileName = `sorted_${algo}.txt`;
+            const content = sortData.sortedArray.join(', ');
+            const blob = new Blob([content + '\n'], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+
+            sortPlayer.el.status.textContent = `Файл ${fileName} скачан`;
+        } catch (error) {
+            sortPlayer.el.status.textContent = `Ошибка: ${error.message}`;
+            console.error(error);
+        }
+    });
+}
+
+async function loadSortingData() {
+    const raw = sortDataInput.value;
+    const data = parseSortInput(raw);
+    if (data.length === 0) {
+        throw new Error('Введите числа через запятую');
+    }
+    if (data.length > MAX_SORT_ITEMS) {
+        throw new Error(`Можно ввести максимум ${MAX_SORT_ITEMS} чисел`);
+    }
+
+    const algo = document.getElementById('sort-algo').value;
+    if (!algo) {
+        throw new Error('Выберите алгоритм сортировки');
+    }
+
+    const res = await fetch(`/api/sorting/${algo}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data }),
+    });
+
+    if (!res.ok) {
+        let msg = res.statusText;
+        try { const j = await res.json(); msg = j.detail || msg; } catch { }
+        throw new Error(msg);
+    }
+
+    return await res.json();
+}
+
+sortPlayer.el.play.addEventListener('click', async () => {
+    const algo = document.getElementById('sort-algo').value;
+
+    if (sortPlayer.steps.length === 0 || !sortData.initialArray.length) {
+        sortPlayer.el.status.textContent = 'Загрузка...';
+
+        try {
+            const result = await loadSortingData();
+            applySortingResult(result, algo);
+
+        } catch (e) {
+            sortPlayer.el.status.textContent = `Ошибка: ${e.message}`;
+            console.error(e);
+            return;
+        }
+    }
+
+    if (sortPlayer.playing) {
+        stopPlayer(sortPlayer);
+    } else {
+        startPlayer(sortPlayer, renderSortStep);
+    }
+});
+
+sortPlayer.el.prev.addEventListener('click', () => {
+    if (sortPlayer.current > 0) {
+        stopPlayer(sortPlayer);
+        sortPlayer.current--;
+        renderSortStep(sortPlayer.current);
+    }
+});
+
+sortPlayer.el.next.addEventListener('click', () => {
+    if (sortPlayer.current < sortPlayer.steps.length - 1) {
+        sortPlayer.current++;
+        renderSortStep(sortPlayer.current);
+    } else {
+        stopPlayer(sortPlayer);
+    }
+});
+
+sortPlayer.el.speed.addEventListener('input', (e) => {
+    sortPlayer.speed = parseInt(e.target.value);
+    sortPlayer.el.speedVal.textContent = sortPlayer.speed + 'ms';
 });
 
 function renderSortStep(idx) {
@@ -182,9 +412,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
         const parts = line.trim().split(/\s+/).map(Number);
         if (parts.some(isNaN)) continue;
         if (algo === 'dijkstra' || algo === 'bellman_ford') {
-            if (parts.length >= 3) {
-                edges.push([parts[0], parts[1], parts[2]]);
-            }
+            if (parts.length >= 3) edges.push([parts[0], parts[1], parts[2]]);
         } else if (parts.length >= 2) {
             edges.push([parts[0], parts[1]]);
         }
@@ -278,15 +506,10 @@ function wireControls(player, renderFn) {
             stopPlayer(player);
         }
     });
-    player.el.play.addEventListener('click', () => {
-        if (player.playing) stopPlayer(player);
-        else startPlayer(player, renderFn);
-    });
     player.el.speed.addEventListener('input', (e) => {
         player.speed = parseInt(e.target.value);
         player.el.speedVal.textContent = player.speed + 'ms';
     });
 }
 
-wireControls(sortPlayer, renderSortStep);
 wireControls(graphPlayer, renderGraphStepAt);

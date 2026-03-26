@@ -123,6 +123,7 @@ body {
 
 input[type="text"],
 input[type="number"],
+input[type="file"],
 textarea,
 select {
     -webkit-appearance: none;
@@ -140,6 +141,7 @@ select {
 
 input[type="text"]:focus,
 input[type="number"]:focus,
+input[type="file"]:focus,
 textarea:focus,
 select:focus {
     border-color: var(--accent);
@@ -149,6 +151,11 @@ select:focus {
 input[type="text"] {
     flex: 1;
     min-width: 200px;
+}
+
+input[type="file"] {
+    min-width: 240px;
+    cursor: pointer;
 }
 
 textarea {
@@ -190,6 +197,17 @@ select {
 
 .btn:active {
     transform: translateY(0);
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn:disabled:hover {
+    background: var(--border);
+    transform: none;
 }
 
 .btn.primary {

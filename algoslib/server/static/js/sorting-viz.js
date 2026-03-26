@@ -12,12 +12,44 @@ export function getCellColor(len, compare_a, compare_b, sortedCount, idx, direct
     return 'blue';
 }
 
+const DEFAULT_CELL_FONT_SIZE = 18;
+const MIN_CELL_FONT_SIZE = 4;
+const SCALE_FROM_DIGITS = 5;
+
+function getIntegerDigitCount(value) {
+    if (!Number.isFinite(value)) return 1;
+    const absValue = Math.abs(value);
+    if (absValue < 1) return 1;
+    return Math.floor(absValue).toString().length;
+}
+
+function getCellFontSize(value) {
+    const integerDigits = getIntegerDigitCount(value);
+    if (integerDigits < SCALE_FROM_DIGITS) {
+        return `${DEFAULT_CELL_FONT_SIZE}px`;
+    }
+
+    const text = String(value);
+    const estimatedFitSize = Math.floor(72 / Math.max(text.length, 1));
+    const fontSize = Math.max(
+        MIN_CELL_FONT_SIZE,
+        Math.min(DEFAULT_CELL_FONT_SIZE, estimatedFitSize)
+    );
+
+    return `${fontSize}px`;
+}
+
+function applyCellValue(cell, value) {
+    cell.textContent = value;
+    cell.style.fontSize = getCellFontSize(Number(value));
+}
+
 export function renderSortingCells(container, data, compare_a, compare_b, sortedCount, speed, direction = 'end') {
     container.innerHTML = '';
     data.forEach((val, i) => {
         const cell = document.createElement('div');
         cell.className = `cell ${getCellColor(data.length, compare_a, compare_b, sortedCount, i, direction)}`;
-        cell.textContent = val;
+        applyCellValue(cell, val);
         cell.style.transition = `all ${speed}ms ease`;
         container.appendChild(cell);
     });
@@ -29,7 +61,7 @@ export function updateSortingStep(container, history, initialArray, stepIndex, s
     const { compare_a, compare_b, sorted_num: sortedCount } = step;
 
     const cells = container.querySelectorAll('.cell');
-    if (cells.length === 0) {
+    if (cells.length !== data.length) {
         renderSortingCells(container, data, compare_a, compare_b, sortedCount, speed, direction);
         return formatStatus(data, step, stepIndex, history.length);
     }
@@ -37,7 +69,7 @@ export function updateSortingStep(container, history, initialArray, stepIndex, s
     data.forEach((val, i) => {
         const cell = cells[i];
         if (!cell) return;
-        cell.textContent = val;
+        applyCellValue(cell, val);
         cell.className = `cell ${getCellColor(data.length, compare_a, compare_b, sortedCount, i, direction)}`;
 
         if (i === compare_a || i === compare_b) {

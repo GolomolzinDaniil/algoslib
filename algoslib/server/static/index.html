@@ -27,17 +27,19 @@
 
     <section id="sorting" class="page active">
 
-        <div class="sorting-header" id="sort-header" style="display:none">
-            <div class="sorting-header-title" id="sort-title">Bubble Sort</div>
-            <div class="sorting-header-desc" id="sort-desc">Описание...</div>
-            <div class="sorting-header-time" id="sort-time">Время: O(n²)</div>
-            <div class="sorting-header-memory" id="sort-memory">Память: O(1)</div>
+        <div class="sorting-header" id="sort-header" style="display: block;">
+            <div class="sorting-header-title" id="sort-title">Сортировки</div>
+            <div class="sorting-header-desc" id="sort-desc">Выберите алгоритм сортировки и введите массив для
+                визуализации</div>
+            <div class="sorting-header-time" id="sort-time"></div>
+            <div class="sorting-header-memory" id="sort-memory"></div>
         </div>
 
         <div class="input-panel">
             <div class="input-row">
                 <label>Алгоритм:</label>
                 <select id="sort-algo">
+                    <option value="" disabled selected>— Выберите алгоритм —</option>
                     <option value="bubble">Bubble Sort</option>
                     <option value="selection">Selection Sort</option>
                     <option value="gnome">Gnome Sort</option>
@@ -48,11 +50,14 @@
                 <input type="text" id="sort-data" value="5, 3, 8, 1, 4, 2, 7, 6" placeholder="5, 3, 1, 4, 2">
             </div>
             <div class="input-row">
-                <button class="btn primary" id="sort-run">
-                    <i data-lucide="play"></i>
-                    <span>Запустить</span>
+                <label>TXT файл:</label>
+                <input type="file" id="sort-file" accept=".txt,text/plain">
+                <button class="btn" id="sort-download-file">
+                    <i data-lucide="download"></i>
+                    <span>Скачать отсортированный .txt</span>
                 </button>
             </div>
+
         </div>
 
         <div class="viz-container">
