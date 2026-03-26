@@ -19,7 +19,6 @@
     --red: #f38ba8;
     --green: #a6e3a1;
     --status: #89b4fa;
-
     --font: 'JetBrains Mono', monospace;
     --radius: 4px;
     --radius-lg: 8px;
@@ -54,7 +53,6 @@ body {
     padding: 10px 20px;
     font-size: 13px;
     font-weight: 500;
-    font-family: var(--font);
     cursor: pointer;
     transition: color 0.15s, border-color 0.15s;
     display: flex;
@@ -136,7 +134,6 @@ select {
     padding: 14px 10px !important;
     border-radius: var(--radius-lg);
     font-size: 15px;
-    font-family: var(--font);
     outline: none;
     transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -173,7 +170,7 @@ select {
     border-radius: var(--radius-lg);
     cursor: pointer;
     transition: all 0.2s ease;
-    font-weight: 600;
+    font-weight: 500;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -231,7 +228,7 @@ select {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: bold;
+    font-weight: 500;
     font-size: 18px;
     border-radius: var(--radius-lg);
     border: 2px solid var(--bg);
@@ -276,7 +273,6 @@ input[type="range"] {
 
 .status {
     text-align: center;
-    font-family: 'Courier New', monospace;
     color: var(--status);
     font-size: 1.1em;
     min-height: 1.5em;
@@ -285,7 +281,6 @@ input[type="range"] {
 
 .step-counter {
     text-align: center;
-    font-family: 'Courier New', monospace;
     color: var(--text-muted);
     font-size: 0.95em;
     margin-top: 10px;
@@ -301,7 +296,7 @@ input[type="range"] {
 
 .step-counter span {
     color: var(--accent);
-    font-weight: 600;
+    font-weight: 500;
 }
 
 #sorting .sorting-header {
@@ -317,26 +312,28 @@ input[type="range"] {
 }
 
 #sorting .sorting-header-title {
-    font-weight: bold;
-    font-size: 1.8em;
-    margin: 0 0 8px 0;
+    font-weight: 500;
+    font-size: 30px;
     color: var(--accent);
-    line-height: 1.5;
+    line-height: 1.4;
+    margin: 6px 0;
 }
 
 #sorting .sorting-header-desc {
-    font-size: 1.3em;
-    margin: 0 0 6px 0;
-    color: var(--text-muted);
-    line-height: 1.2;
+    font-weight: 400;
+    font-size: 18px;
+    color: var(--text);
+    line-height: 1.4;
+    margin: 6px 0;
 }
 
 #sorting .sorting-header-time,
 #sorting .sorting-header-memory {
-    font-size: 1.1em;
-    margin: 4px 0;
-    color: var(--status);
-    font-family: 'Courier New', monospace;
+    font-weight: 300;
+    font-size: 14px;
+    color: var(--text);
+    line-height: 1.4;
+    margin: 6px 0;
 }
 
 #graph-svg {
