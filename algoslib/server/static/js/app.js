@@ -15,6 +15,13 @@ const SORTING_META = {
         time: "Время: O(n²)",
         memory: "Память: О(1)",
         direction: "start"
+    },
+    gnome: {
+        title: "Gnome Sort",
+        desc: "Сравнивает соседние элементы и меняет их местами, двигаясь назад при необходимости",
+        time: "Время: O(n²)",
+        memory: "Память: О(1)",
+        direction: "end"
     }
 };
 
@@ -198,7 +205,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
         });
         if (!res.ok) {
             let msg = res.statusText;
-            try { const j = await res.json(); msg = j.detail || msg; } catch {}
+            try { const j = await res.json(); msg = j.detail || msg; } catch { }
             throw new Error(msg);
         }
         const result = await res.json();
