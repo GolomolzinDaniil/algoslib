@@ -4,6 +4,7 @@
 #include "selection_sort.hpp"
 #include "gnome_sort.hpp"
 #include "bogo_sort.hpp"
+#include <insertion_sort.hpp>
 
 
 PYBIND11_MODULE(sub_sorting, m) {
@@ -46,7 +47,15 @@ PYBIND11_MODULE(sub_sorting, m) {
         },
         py::arg("data")
     );
-
+    m.def(
+        "insertion_sort_h",
+        [](const py::list& data) {
+            return get_history([](auto vec) {
+                return insertion_sort_h(vec);
+            }, data);
+        },
+        py::arg("data")
+    );
     
     m.def(
         "bubble_sort",
@@ -75,7 +84,7 @@ PYBIND11_MODULE(sub_sorting, m) {
         },
         py::arg("data")
     );
-        m.def(
+    m.def(
         "bogo_sort",
         [](const py::list& data) {
             return get_sorted([](auto vec) {
@@ -84,4 +93,14 @@ PYBIND11_MODULE(sub_sorting, m) {
         },
         py::arg("data")
     );
+    m.def(
+        "insertion_sort",
+        [](const py::list& data) {
+            return get_sorted([](auto vec) {
+                return insertion_sort(vec);
+            }, data);
+        },
+        py::arg("data")
+    );
+
 };
