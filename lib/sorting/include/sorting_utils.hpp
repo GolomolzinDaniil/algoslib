@@ -9,6 +9,7 @@
 #include "selection_sort.hpp"
 #include "gnome_sort.hpp"
 #include "bogo_sort.hpp"
+#include "insertion_sort.hpp"
 
 
 namespace py = pybind11;
@@ -71,6 +72,40 @@ inline py::list to_py(const std::vector<Bogo_step>& history)
             py::dict(
                 py::arg("indexes") = step.indexes,
                 py::arg("is_sorted") = step.is_sorted
+            )
+        );
+    }
+    return res;
+};
+
+inline py::list to_py(const std::vector<Insertion_step<std::int64_t>>& history)
+{
+    py::list res;
+    for (const auto& step : history)
+    {
+        res.append(
+            py::dict(
+                py::arg("compare_a") = step.compare_a,
+                py::arg("compare_b") = step.compare_b,
+                py::arg("is_shift") = step.is_shift,
+                py::arg("value") = step.value
+            )
+        );
+    }
+    return res;
+};
+
+inline py::list to_py(const std::vector<Insertion_step<double>>& history)
+{
+    py::list res;
+    for (const auto& step : history)
+    {
+        res.append(
+            py::dict(
+                py::arg("compare_a") = step.compare_a,
+                py::arg("compare_b") = step.compare_b,
+                py::arg("is_shift") = step.is_shift,
+                py::arg("value") = step.value
             )
         );
     }
