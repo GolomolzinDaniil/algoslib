@@ -13,7 +13,7 @@ PYBIND11_MODULE(sub_sorting, m) {
     m.def(
         "bubble_sort_h",
         [](const py::list& data) {
-            return get_history([](std::vector<int>& vec) {
+            return get_history([](auto vec) {
                 return bubble_sort_h(vec);
             }, data);
         },
@@ -22,7 +22,7 @@ PYBIND11_MODULE(sub_sorting, m) {
     m.def(
         "selection_sort_h",
         [](const py::list& data) {
-            return get_history([](std::vector<int>& vec) {
+            return get_history([](auto vec) {
                 return selection_sort_h(vec);
             }, data);
         },
@@ -31,7 +31,7 @@ PYBIND11_MODULE(sub_sorting, m) {
     m.def(
         "gnome_sort_h",
         [](const py::list& data) {
-            return get_history([](std::vector<int>& vec) {
+            return get_history([](auto vec) {
                 return gnome_sort_h(vec);
             }, data);
         },
@@ -40,7 +40,7 @@ PYBIND11_MODULE(sub_sorting, m) {
     m.def(
         "bogo_sort_h",
         [](const py::list& data) {
-            return get_history([](std::vector<int>& vec) {
+            return get_history([](auto vec) {
                 return bogo_sort_h(vec);
             }, data);
         },
@@ -51,7 +51,7 @@ PYBIND11_MODULE(sub_sorting, m) {
     m.def(
         "bubble_sort",
         [](const py::list& data) {
-            return get_sorted([](std::vector<int>& vec) {
+            return get_sorted([](auto vec) {
                 return bubble_sort(vec);
             }, data);
         },
@@ -60,7 +60,7 @@ PYBIND11_MODULE(sub_sorting, m) {
     m.def(
         "selection_sort",
         [](const py::list& data) {
-            return get_sorted([](std::vector<int>& vec) {
+            return get_sorted([](auto vec) {
                 return selection_sort(vec);
             }, data);
         },
@@ -69,7 +69,7 @@ PYBIND11_MODULE(sub_sorting, m) {
     m.def(
         "gnome_sort",
         [](const py::list& data) {
-            return get_sorted([](std::vector<int>& vec) {
+            return get_sorted([](auto vec) {
                 return gnome_sort(vec);
             }, data);
         },
@@ -78,7 +78,7 @@ PYBIND11_MODULE(sub_sorting, m) {
         m.def(
         "bogo_sort",
         [](const py::list& data) {
-            return get_sorted([](std::vector<int>& vec) {
+            return get_sorted([](auto vec) {
                 return bogo_sort(vec);
             }, data);
         },
