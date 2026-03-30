@@ -8,6 +8,7 @@
 #include "bubble_sort.hpp"
 #include "selection_sort.hpp"
 #include "gnome_sort.hpp"
+#include "bogo_sort.hpp"
 
 
 namespace py = pybind11;
@@ -59,6 +60,21 @@ inline py::list to_py(const std::vector<Gnome_step>& history)
                 py::arg("compare_a") = step.compare_a,
                 py::arg("compare_b") = step.compare_b,
                 py::arg("is_swap") = step.is_swap
+            )
+        );
+    }
+    return res;
+};
+
+inline py::list to_py(const std::vector<Bogo_step>& history)
+{
+    py::list res;
+    for (const auto& step : history)
+    {
+        res.append(
+            py::dict(
+                py::arg("indexes") = step.indexes,
+                py::arg("is_sorted") = step.is_sorted
             )
         );
     }
