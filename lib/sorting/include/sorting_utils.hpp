@@ -8,14 +8,11 @@
 #include "bubble_sort.hpp"
 #include "selection_sort.hpp"
 #include "gnome_sort.hpp"
+#include "bogo_sort.hpp"
 
 
 namespace py = pybind11;
 
-inline std::vector<int> list2vector(const py::list& list)
-{
-    return list.cast<std::vector<int>>();
-};
 
 inline py::list to_py(const std::vector<Bubble_step>& history)
 {
@@ -65,22 +62,62 @@ inline py::list to_py(const std::vector<Gnome_step>& history)
     return res;
 };
 
-template<typename Func>
-inline py::list get_history(Func&& func, const py::list& list)
+inline py::list to_py(const std::vector<Bogo_step>& history)
 {
-    auto vec = list2vector(list);
-    auto history = func(vec);
-    return to_py(history);
+    py::list res;
+    for (const auto& step : history)
+    {
+        res.append(
+            py::dict(
+                py::arg("indexes") = step.indexes,
+                py::arg("is_sorted") = step.is_sorted
+            )
+        );
+    }
+    return res;
+};
+
+template<typename T>
+inline std::vector<T> list2vector(const py::list& list)
+{
+    return list.cast<std::vector<T>>();
+};
+
+template<typename Func>
+py::list get_history(Func&& func, const py::list& list)
+{   
+    try {
+        auto vec = list2vector<std::int64_t>(list);
+        auto history = func(vec);
+        return to_py(history);
+    }
+    catch (const py::cast_error&) {
+        auto vec = list2vector<double>(list);
+        auto history = func(vec);
+        return to_py(history);
+    }
+    catch (const std::exception& e) {
+        throw py::type_error(std::string("Conversion failed: ") + e.what());
+    }
 };
 
 template<typename Func>
 inline py::list get_sorted(Func&& func, const py::list& list)
-{
-    auto vec = list2vector(list);
-    auto sorted_vec = func(vec);
-    return py::cast(sorted_vec);
+{   
+    try{
+        auto vec = list2vector<std::int64_t>(list);
+        auto sorted_vec = func(vec);
+        return py::cast(sorted_vec);
+    }
+    catch (const py::cast_error&){
+        auto vec = list2vector<double>(list);
+        auto sorted_vec = func(vec);
+        return py::cast(sorted_vec);
+    }
+    catch (const std::exception& e) {
+        throw py::type_error(std::string("Conversion failed: ") + e.what());
+    }
 };
-
 
 
 // template<typename T>
@@ -130,48 +167,6 @@ inline py::list get_sorted(Func&& func, const py::list& list)
 // };
 
 
-// template<typename Func>
-// py::list type_dispatcher_h(Func&& func, const py::object& obj)
-// {
-//     // если np.array
-//     if (py::isinstance<py::array>(obj)) {
-
-//         auto arr = py::cast<py::array>(obj);
-//         auto dtype = arr.dtype();
-
-//         // знаковые
-//         if      (dtype.is(py::dtype::of<std::int8_t>()))   return get_history<std::int8_t>(func, arr);
-//         else if (dtype.is(py::dtype::of<std::int16_t>()))  return get_history<std::int16_t>(func, arr);
-//         else if (dtype.is(py::dtype::of<std::int32_t>()))  return get_history<std::int32_t>(func, arr);
-//         else if (dtype.is(py::dtype::of<std::int64_t>()))  return get_history<std::int64_t>(func, arr);
-//         // беззнаковые
-//         else if(dtype.is(py::dtype::of<std::uint8_t>()))   return get_history<std::uint8_t>(func, arr);
-//         else if (dtype.is(py::dtype::of<std::uint16_t>())) return get_history<std::uint16_t>(func, arr);
-//         else if (dtype.is(py::dtype::of<std::uint32_t>())) return get_history<std::uint32_t>(func, arr);
-//         else if (dtype.is(py::dtype::of<std::uint64_t>())) return get_history<std::uint64_t>(func, arr);
-//         // с плавающей точкой
-//         else if (dtype.is(py::dtype::of<float>()))         return get_history<float>(func, arr);
-//         else if (dtype.is(py::dtype::of<double>()))        return get_history<double>(func, arr);
-//         else throw std::invalid_argument("Unsupported type: " + py::str(dtype).cast<std::string>());
-//     }
-//     // иначе python объект
-//     else if (py::isinstance<py::list>(obj) || py::isinstance<py::tuple>(obj))
-//     {
-//         try {
-//             return get_history<std::int64_t>(func, obj);
-//         }
-//         catch (const py::cast_error&) {
-//             return get_history<double>(func, obj);  
-//         }
-//         catch (const std::exception& e) {
-//             throw py::type_error(std::string("Conversion failed: ") + e.what());
-//         }
-//     }
-//     // не поддерживаемая структура
-//     throw std::invalid_argument(
-//             "The object of type '" + py::str(py::type(obj)).cast<std::string>() + "' is not supported. "
-//             "Expected: [np.array, list, tuple, set, frozenset]");
-// };
 
 
 // template<typename T, typename Func>
