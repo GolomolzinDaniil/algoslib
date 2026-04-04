@@ -1,10 +1,10 @@
 import pytest
 
 # можно добавить и bogo_sort но тесты будут ложиться раз через раз
-from algoslib.sorting.sub_sorting import bubble_sort, selection_sort, gnome_sort, insertion_sort
+from algoslib.sorting.sub_sorting import bubble_sort, selection_sort, gnome_sort, insertion_sort, quick_sort
 
 
-ALGORITHMS = [bubble_sort, selection_sort, gnome_sort, insertion_sort]
+ALGORITHMS = [bubble_sort, selection_sort, gnome_sort, insertion_sort, quick_sort]
 
 @pytest.mark.parametrize("func", ALGORITHMS)
 def test_zero_arr(func):

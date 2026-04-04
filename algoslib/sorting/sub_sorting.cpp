@@ -4,7 +4,8 @@
 #include "selection_sort.hpp"
 #include "gnome_sort.hpp"
 #include "bogo_sort.hpp"
-#include <insertion_sort.hpp>
+#include "insertion_sort.hpp"
+#include "quick_sort.hpp"
 
 
 PYBIND11_MODULE(sub_sorting, m) {
@@ -56,6 +57,15 @@ PYBIND11_MODULE(sub_sorting, m) {
         },
         py::arg("data")
     );
+    m.def(
+        "quick_sort_h",
+        [](const py::list& data) {
+            return get_history([](auto vec) {
+                return quick_sort_h(vec);
+            }, data);
+        },
+        py::arg("data")
+    );
     
     m.def(
         "bubble_sort",
@@ -102,5 +112,13 @@ PYBIND11_MODULE(sub_sorting, m) {
         },
         py::arg("data")
     );
-
+    m.def(
+        "quick_sort",
+        [](const py::list& data) {
+            return get_sorted([](auto vec) {
+                return quick_sort(vec);
+            }, data);
+        },
+        py::arg("data")
+    );
 };

@@ -10,6 +10,7 @@
 #include "gnome_sort.hpp"
 #include "bogo_sort.hpp"
 #include "insertion_sort.hpp"
+#include "quick_sort.hpp"
 
 
 namespace py = pybind11;
@@ -106,6 +107,23 @@ inline py::list to_py(const std::vector<Insertion_step<double>>& history)
                 py::arg("compare_b") = step.compare_b,
                 py::arg("is_shift") = step.is_shift,
                 py::arg("value") = step.value
+            )
+        );
+    }
+    return res;
+};
+
+inline py::list to_py(const std::vector<Quick_step>& history)
+{
+    py::list res;
+    for (const auto& step : history)
+    {
+        res.append(
+            py::dict(
+                py::arg("low") = step.low,
+                py::arg("high") = step.high,
+                py::arg("curr_ind") = step.curr_ind,
+                py::arg("is_swap") = step.is_swap
             )
         );
     }
