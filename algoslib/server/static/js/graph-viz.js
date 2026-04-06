@@ -1,3 +1,13 @@
+import {
+    forceSimulation,
+    forceLink,
+    forceManyBody,
+    forceCenter,
+    forceCollide,
+    forceX,
+    forceY,
+} from 'd3-force';
+
 const COLORS = {
     defaultNode: '#569cd6',
     current:     '#f44747',
@@ -11,11 +21,12 @@ const COLORS = {
 };
 
 const NODE_R = 22;
+const W = 600, H = 400;
 
 let positions = {};
 
 export function renderGraph(svg, nodes, edges, weighted) {
-    positions = circularLayout(nodes, 600, 400);
+    positions = forceLayout(nodes, edges, W, H);
     draw(svg, nodes, edges, weighted, {}, [], null, null);
 }
 
@@ -52,14 +63,41 @@ export function updateGraphStep(svg, nodes, edges, step, algorithm) {
     return formatInfo(step, algorithm);
 }
 
-function circularLayout(nodes, w, h) {
-    const cx = w / 2, cy = h / 2;
-    const r = Math.min(w, h) / 2 - 50;
+function forceLayout(nodes, edges, w, h) {
+    const pad = NODE_R + 20;
+
+    const simNodes = nodes.map(id => ({ id }));
+    const nodeIndex = {};
+    simNodes.forEach((n, i) => { nodeIndex[n.id] = i; });
+
+    const simLinks = [];
+    for (const e of edges) {
+        const src = nodeIndex[e[0]], tgt = nodeIndex[e[1]];
+        if (src !== undefined && tgt !== undefined) {
+            simLinks.push({ source: src, target: tgt });
+        }
+    }
+
+    const linkDist = Math.max(60, Math.min(140, 600 / nodes.length));
+
+    const sim = forceSimulation(simNodes)
+        .force('charge', forceManyBody().strength(-250))
+        .force('link', forceLink(simLinks).distance(linkDist).strength(1))
+        .force('center', forceCenter(w / 2, h / 2))
+        .force('collide', forceCollide(NODE_R + 8))
+        .force('x', forceX(w / 2).strength(0.05))
+        .force('y', forceY(h / 2).strength(0.05))
+        .stop();
+
+    for (let i = 0; i < 300; i++) sim.tick();
+
     const pos = {};
-    nodes.forEach((node, i) => {
-        const angle = (2 * Math.PI * i) / nodes.length - Math.PI / 2;
-        pos[node] = { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
-    });
+    for (const n of simNodes) {
+        pos[n.id] = {
+            x: Math.max(pad, Math.min(w - pad, n.x)),
+            y: Math.max(pad, Math.min(h - pad, n.y)),
+        };
+    }
     return pos;
 }
 
