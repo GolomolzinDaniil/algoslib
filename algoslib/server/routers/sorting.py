@@ -1,15 +1,21 @@
 import traceback
 import math
+import random
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from algoslib.sorting.sub_sorting import (
-    bubble_sort_h,
-    selection_sort_h,
-    gnome_sort_h,
-)
+try:
+    from algoslib.sorting import sub_sorting as sub_sorting_cpp
+except Exception:
+    sub_sorting_cpp = None
+
+
+bubble_sort_h = getattr(sub_sorting_cpp, "bubble_sort_h", None) if sub_sorting_cpp else None
+selection_sort_h = getattr(sub_sorting_cpp, "selection_sort_h", None) if sub_sorting_cpp else None
+gnome_sort_h = getattr(sub_sorting_cpp, "gnome_sort_h", None) if sub_sorting_cpp else None
+bogo_sort_h = getattr(sub_sorting_cpp, "bogo_sort_h", None) if sub_sorting_cpp else None
 
 
 router = APIRouter()
@@ -144,6 +150,29 @@ def gnome_sort_history_py(data: list[float | int]) -> list[dict]:
     return history
 
 
+def bogo_sort_history_py(data: list[float | int]) -> list[dict]:
+    arr = list(data)
+    size = len(arr)
+    indexes = list(range(size))
+    is_sorted = False
+    history = [{"indexes": list(indexes), "is_sorted": is_sorted}]
+    num_shuffle = 300
+
+    while not is_sorted and num_shuffle > 0:
+        num_shuffle -= 1
+        random.shuffle(indexes)
+
+        is_sorted = True
+        for ind in range(1, size):
+            if arr[indexes[ind - 1]] > arr[indexes[ind]]:
+                is_sorted = False
+                break
+
+        history.append({"indexes": list(indexes), "is_sorted": is_sorted})
+
+    return history
+
+
 def normalize_sort_step(step: dict, algo: str) -> dict:
     if algo == "bubble":
         return {
@@ -166,6 +195,11 @@ def normalize_sort_step(step: dict, algo: str) -> dict:
             "is_swap": step.get("is_swap", False),
             "sorted_num": step.get("sorted_num", 0)
         }
+    elif algo == "bogo":
+        return {
+            "indexes": [int(i) for i in step.get("indexes", [])],
+            "is_sorted": bool(step.get("is_sorted", False)),
+        }
     return step
 
 
@@ -173,7 +207,7 @@ def normalize_sort_step(step: dict, algo: str) -> dict:
 async def run_bubble_sort(req: SortRequest):
     try:
         data = list(req.data)
-        if can_use_cpp_binding(data):
+        if bubble_sort_h is not None and can_use_cpp_binding(data):
             arr = list(data)
             try:
                 raw_history = bubble_sort_h(arr)
@@ -204,7 +238,7 @@ async def run_bubble_sort(req: SortRequest):
 async def run_selection_sort(req: SortRequest):
     try:
         data = list(req.data)
-        if can_use_cpp_binding(data):
+        if selection_sort_h is not None and can_use_cpp_binding(data):
             arr = list(data)
             try:
                 raw_history = selection_sort_h(arr)
@@ -234,7 +268,7 @@ async def run_selection_sort(req: SortRequest):
 async def run_gnome_sort(req: SortRequest):
     try:
         data = list(req.data)
-        if can_use_cpp_binding(data):
+        if gnome_sort_h is not None and can_use_cpp_binding(data):
             arr = list(data)
             try:
                 raw_history = gnome_sort_h(arr)
@@ -255,6 +289,38 @@ async def run_gnome_sort(req: SortRequest):
             "sorted_array": get_sorted_array(data, "gnome"),
             "direction": "bidirectional",
             "algo": "gnome"
+        }
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
+@router.post("/bogo")
+async def run_bogo_sort(req: SortRequest):
+    try:
+        data = list(req.data)
+        if bogo_sort_h is not None and can_use_cpp_binding(data):
+            arr = list(data)
+            try:
+                raw_history = bogo_sort_h(arr)
+                history = [normalize_sort_step(dict(s), algo="bogo") for s in raw_history]
+            except Exception:
+                history = bogo_sort_history_py(data)
+        else:
+            history = bogo_sort_history_py(data)
+
+        identity_indexes = list(range(len(data)))
+        if not history:
+            history = [{"indexes": identity_indexes, "is_sorted": len(data) <= 1}]
+        elif history[0].get("indexes") != identity_indexes:
+            history.insert(0, {"indexes": identity_indexes, "is_sorted": False})
+
+        return {
+            "history": history,
+            "initial_array": data,
+            "sorted_array": get_sorted_array(data, "bogo"),
+            "direction": "bogo",
+            "algo": "bogo"
         }
     except Exception as e:
         traceback.print_exc()
