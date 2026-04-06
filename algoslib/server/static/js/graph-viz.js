@@ -6,7 +6,7 @@ import {
     forceCollide,
     forceX,
     forceY,
-} from 'd3-force';
+} from 'https://cdn.jsdelivr.net/npm/d3-force@3/+esm';
 
 const COLORS = {
     defaultNode: '#569cd6',
@@ -24,9 +24,12 @@ const NODE_R = 22;
 const W = 600, H = 400;
 
 let positions = {};
+let currentSpacing = 5;
+
+export function setSpacing(val) { currentSpacing = val; }
 
 export function renderGraph(svg, nodes, edges, weighted) {
-    positions = forceLayout(nodes, edges, W, H);
+    positions = forceLayout(nodes, edges, W, H, currentSpacing);
     draw(svg, nodes, edges, weighted, {}, [], null, null);
 }
 
@@ -63,7 +66,9 @@ export function updateGraphStep(svg, nodes, edges, step, algorithm) {
     return formatInfo(step, algorithm);
 }
 
-function forceLayout(nodes, edges, w, h) {
+/* spacing: 1 (очень кучно) … 10 (максимально разреженно) */
+function forceLayout(nodes, edges, w, h, spacing) {
+    const s = (spacing || 5) / 5;           // нормализуем: 1→0.2, 5→1, 10→2
     const pad = NODE_R + 20;
 
     const simNodes = nodes.map(id => ({ id }));
@@ -78,13 +83,16 @@ function forceLayout(nodes, edges, w, h) {
         }
     }
 
-    const linkDist = Math.max(60, Math.min(140, 600 / nodes.length));
+    const baseDist = Math.max(60, Math.min(140, 600 / nodes.length));
+    const linkDist = baseDist * s;
+    const charge  = -250 * s;
+    const collide = (NODE_R + 8) * s;
 
     const sim = forceSimulation(simNodes)
-        .force('charge', forceManyBody().strength(-250))
+        .force('charge', forceManyBody().strength(charge))
         .force('link', forceLink(simLinks).distance(linkDist).strength(1))
         .force('center', forceCenter(w / 2, h / 2))
-        .force('collide', forceCollide(NODE_R + 8))
+        .force('collide', forceCollide(collide))
         .force('x', forceX(w / 2).strength(0.05))
         .force('y', forceY(h / 2).strength(0.05))
         .stop();

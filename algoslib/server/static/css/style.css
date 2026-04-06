@@ -381,12 +381,18 @@ select {
     flex-wrap: wrap;
 }
 
-.speed-control {
+.speed-control,
+.graph-spacing-control {
     display: flex;
     align-items: center;
     gap: 10px;
     font-size: 0.95em;
     color: var(--text-muted);
+}
+
+.graph-spacing-control {
+    justify-content: center;
+    margin-bottom: 10px;
 }
 
 input[type="range"] {

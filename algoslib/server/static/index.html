@@ -128,6 +128,12 @@
             </div>
         </div>
 
+        <div class="graph-spacing-control">
+            <span>Разреженность:</span>
+            <input type="range" id="graph-spacing" min="1" max="10" value="5" step="1">
+            <span id="graph-spacing-val">5</span>
+        </div>
+
         <div class="viz-container">
             <svg id="graph-svg" viewBox="0 0 600 400"></svg>
         </div>
@@ -158,7 +164,6 @@
 
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
     <script>lucide.createIcons();</script>
-    <script type="importmap">{"imports":{"d3-force":"https://cdn.jsdelivr.net/npm/d3-force@3/+esm","d3-quadtree":"https://cdn.jsdelivr.net/npm/d3-quadtree@3/+esm","d3-dispatch":"https://cdn.jsdelivr.net/npm/d3-dispatch@3/+esm","d3-timer":"https://cdn.jsdelivr.net/npm/d3-timer@3/+esm"}}</script>
     <script type="module" src="/static/js/app.js"></script>
 </body>
 

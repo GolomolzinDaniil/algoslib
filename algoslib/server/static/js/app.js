@@ -1,5 +1,5 @@
 import { renderSortingCells, updateSortingStep } from './sorting-viz.js';
-import { renderGraph, updateGraphStep } from './graph-viz.js';
+import { renderGraph, updateGraphStep, setSpacing } from './graph-viz.js';
 
 const SORTING_META = {
     bubble: {
@@ -415,6 +415,19 @@ function renderSortStep(idx) {
 
 const graphSvg = document.getElementById('graph-svg');
 const graphInfo = document.getElementById('graph-info');
+
+const spacingSlider = document.getElementById('graph-spacing');
+const spacingVal   = document.getElementById('graph-spacing-val');
+spacingSlider.addEventListener('input', () => {
+    spacingVal.textContent = spacingSlider.value;
+    setSpacing(Number(spacingSlider.value));
+    if (graphData) {
+        const algo = graphData.algorithm;
+        const weighted = algo === 'dijkstra' || algo === 'bellman_ford';
+        renderGraph(graphSvg, graphData.nodes, graphData.edges, weighted);
+        if (graphPlayer.steps.length) renderGraphStepAt(graphPlayer.current);
+    }
+});
 
 document.getElementById('graph-algo').addEventListener('change', (e) => {
     const label = document.getElementById('edges-label');
