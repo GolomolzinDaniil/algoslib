@@ -22,6 +22,27 @@ const SORTING_META = {
         time: "Время: O(n²)",
         memory: "Память: О(1)",
         direction: "end"
+    },
+    bogo: {
+        title: "Bogo Sort",
+        desc: "Случайно перемешивает индексы до момента, когда порядок элементов становится отсортированным",
+        time: "Время: O((n + 1)!) в среднем",
+        memory: "Память: О(n)",
+        direction: "bogo"
+    },
+    quick: {
+        title: "Quick Sort",
+        desc: "Выбирает опорный элемент и делит массив на части, рекурсивно сортируя их",
+        time: "Время: O(n log n) в среднем, O(n²) в худшем",
+        memory: "Память: О(log n)",
+        direction: "quick"
+    },
+    insertion: {
+        title: "Insertion Sort",
+        desc: "Сдвигает элементы вправо и вставляет текущий элемент в подходящую позицию",
+        time: "Время: O(n²)",
+        memory: "Память: О(1)",
+        direction: "insertion"
     }
 };
 const MAX_SORT_ITEMS = 15;
@@ -177,12 +198,17 @@ function applySortingResult(result, algo) {
     }
 
     const direction = result.direction || meta.direction || 'end';
+    const firstStep = sortData.history[0] || {};
+    const compareA = Number.isInteger(firstStep.compare_a) ? firstStep.compare_a : -1;
+    const compareB = Number.isInteger(firstStep.compare_b) ? firstStep.compare_b : -1;
+    const sortedNum = Number.isInteger(firstStep.sorted_num) ? firstStep.sorted_num : 0;
+
     renderSortingCells(
         sortPlot,
         sortData.initialArray,
-        sortData.history[0]?.compare_a ?? 0,
-        sortData.history[0]?.compare_b ?? 0,
-        sortData.history[0]?.sorted_num ?? 0,
+        compareA,
+        compareB,
+        sortedNum,
         sortPlayer.speed,
         direction,
         MAX_SORT_VISUAL_ITEMS

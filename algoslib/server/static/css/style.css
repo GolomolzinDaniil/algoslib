@@ -17,6 +17,7 @@
     --accent-text: #1e1e2e;
     --blue: #b2c9ee;
     --red: #f38ba8;
+    --yellow: #f9e28b;
     --green: #a6e3a1;
     --status: #89b4fa;
     --font: 'JetBrains Mono', monospace;
@@ -295,6 +296,10 @@ select {
 
 .cell.red {
     background: var(--red);
+}
+
+.cell.yellow {
+    background: var(--yellow);
 }
 
 .cell.green {
