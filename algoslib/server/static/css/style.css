@@ -158,6 +158,40 @@ input[type="file"] {
     cursor: pointer;
 }
 
+input[type="file"]::file-selector-button,
+input[type="file"]::-webkit-file-upload-button {
+    background: var(--border);
+    color: var(--text);
+    border: 1px solid var(--hover);
+    border-radius: calc(var(--radius-lg) - 2px);
+    padding: 8px 12px;
+    margin-right: 10px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transform: scale(1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+input[type="file"]::file-selector-button:hover,
+input[type="file"]::-webkit-file-upload-button:hover {
+    background: var(--hover);
+    transform: scale(1.03);
+    box-shadow: 0 0 0 3px rgba(178, 201, 238, 0.12);
+}
+
+#sort-download-file {
+    transform: scale(1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+#sort-download-file:hover {
+    background: var(--hover);
+    transform: scale(1.03);
+    box-shadow: 0 0 0 3px rgba(178, 201, 238, 0.12);
+}
+
 textarea {
     width: 100%;
     resize: vertical;

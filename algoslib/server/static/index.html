@@ -39,7 +39,7 @@
             <div class="input-row">
                 <label>Алгоритм:</label>
                 <select id="sort-algo">
-                    <option value="" disabled selected>— Выберите алгоритм —</option>
+                    <option value="" disabled selected>Выберите алгоритм</option>
                     <option value="bubble">Bubble Sort</option>
                     <option value="selection">Selection Sort</option>
                     <option value="gnome">Gnome Sort</option>
@@ -52,9 +52,8 @@
             <div class="input-row">
                 <label>TXT файл:</label>
                 <input type="file" id="sort-file" accept=".txt,text/plain">
-                <button class="btn" id="sort-download-file">
+                <button class="btn" id="sort-download-file" aria-label="Скачать отсортированный .txt" title="Скачать отсортированный .txt">
                     <i data-lucide="download"></i>
-                    <span>Скачать отсортированный .txt</span>
                 </button>
             </div>
 
