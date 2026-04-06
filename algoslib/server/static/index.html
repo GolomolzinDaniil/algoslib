@@ -52,12 +52,16 @@
                 <label>Массив (через запятую, макс. 15):</label>
                 <input type="text" id="sort-data" value="5, 3, 8, 1, 4, 2, 7, 6" placeholder="5, 3, 1, 4, 2">
             </div>
-            <div class="input-row">
+            <div class="input-row file-upload-row">
                 <label>TXT файл:</label>
-                <input type="file" id="sort-file" accept=".txt,text/plain">
-                <button class="btn" id="sort-download-file" aria-label="Скачать отсортированный .txt" title="Скачать отсортированный .txt">
-                    <i data-lucide="download"></i>
-                </button>
+                <div class="file-input-wrapper">
+                    <input type="file" id="sort-file" accept=".txt,text/plain">
+                    <label class="file-input-action" for="sort-file">Выбрать файл</label>
+                    <span class="file-input-name" id="sort-file-name">Файл не выбран</span>
+                    <button type="button" id="sort-download-file" class="file-input-download" aria-label="Скачать отсортированный .txt" title="Скачать отсортированный .txt">
+                        <i data-lucide="square-arrow-down"></i>
+                    </button>
+                </div>
             </div>
 
         </div>
