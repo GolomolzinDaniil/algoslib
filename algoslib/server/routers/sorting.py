@@ -16,6 +16,7 @@ bubble_sort_h = getattr(sub_sorting_cpp, "bubble_sort_h", None) if sub_sorting_c
 selection_sort_h = getattr(sub_sorting_cpp, "selection_sort_h", None) if sub_sorting_cpp else None
 gnome_sort_h = getattr(sub_sorting_cpp, "gnome_sort_h", None) if sub_sorting_cpp else None
 bogo_sort_h = getattr(sub_sorting_cpp, "bogo_sort_h", None) if sub_sorting_cpp else None
+quick_sort_h = getattr(sub_sorting_cpp, "quick_sort_h", None) if sub_sorting_cpp else None
 
 
 router = APIRouter()
@@ -173,6 +174,66 @@ def bogo_sort_history_py(data: list[float | int]) -> list[dict]:
     return history
 
 
+def quick_sort_history_py(data: list[float | int]) -> list[dict]:
+    arr = list(data)
+    size = len(arr)
+    history = [{"compare_a": 0, "compare_b": 0, "is_swap": False, "sorted_num": 0, "low": 0, "high": max(0, size - 1)}]
+
+    if size <= 1:
+        history.append({"compare_a": 0, "compare_b": 0, "is_swap": False, "sorted_num": size, "low": 0, "high": max(0, size - 1)})
+        return history
+
+    stack = [(0, size - 1)]
+    while stack:
+        low, high = stack.pop()
+        if low >= high:
+            continue
+
+        pivot = arr[high]
+        start = low
+
+        for i in range(low, high):
+            history.append({
+                "compare_a": i,
+                "compare_b": high,
+                "is_swap": False,
+                "sorted_num": 0,
+                "low": low,
+                "high": high
+            })
+            if arr[i] < pivot:
+                if i != start:
+                    arr[i], arr[start] = arr[start], arr[i]
+                    history.append({
+                        "compare_a": i,
+                        "compare_b": start,
+                        "is_swap": True,
+                        "sorted_num": 0,
+                        "low": low,
+                        "high": high
+                    })
+                start += 1
+
+        if start != high:
+            arr[start], arr[high] = arr[high], arr[start]
+            history.append({
+                "compare_a": start,
+                "compare_b": high,
+                "is_swap": True,
+                "sorted_num": 0,
+                "low": low,
+                "high": high
+            })
+
+        if start > low:
+            stack.append((low, start - 1))
+        if start + 1 < high:
+            stack.append((start + 1, high))
+
+    history.append({"compare_a": 0, "compare_b": 0, "is_swap": False, "sorted_num": size, "low": 0, "high": max(0, size - 1)})
+    return history
+
+
 def normalize_sort_step(step: dict, algo: str) -> dict:
     if algo == "bubble":
         return {
@@ -199,6 +260,18 @@ def normalize_sort_step(step: dict, algo: str) -> dict:
         return {
             "indexes": [int(i) for i in step.get("indexes", [])],
             "is_sorted": bool(step.get("is_sorted", False)),
+        }
+    elif algo == "quick":
+        compare_a = int(step.get("curr_ind", step.get("compare_a", 0)))
+        compare_b_raw = step.get("target_ind", step.get("compare_b", step.get("high", 0)))
+        compare_b = int(compare_b_raw)
+        return {
+            "compare_a": compare_a,
+            "compare_b": compare_b,
+            "is_swap": bool(step.get("is_swap", False)),
+            "sorted_num": int(step.get("sorted_num", 0)),
+            "low": int(step.get("low", 0)),
+            "high": int(step.get("high", 0)),
         }
     return step
 
@@ -321,6 +394,41 @@ async def run_bogo_sort(req: SortRequest):
             "sorted_array": get_sorted_array(data, "bogo"),
             "direction": "bogo",
             "algo": "bogo"
+        }
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
+@router.post("/quick")
+async def run_quick_sort(req: SortRequest):
+    try:
+        data = list(req.data)
+        if quick_sort_h is not None and can_use_cpp_binding(data):
+            arr = list(data)
+            try:
+                raw_history = [dict(s) for s in quick_sort_h(arr)]
+                # Old .so may not expose target index for swap partner.
+                has_target_info = any(("target_ind" in step) or ("compare_b" in step) for step in raw_history)
+                if not has_target_info:
+                    raise ValueError("quick_sort_h history does not include swap target index")
+                history = [normalize_sort_step(step, algo="quick") for step in raw_history]
+            except Exception:
+                history = quick_sort_history_py(data)
+        else:
+            history = quick_sort_history_py(data)
+
+        if not history or history[0].get("sorted_num", 1) != 0:
+            history.insert(0, {"compare_a": 0, "compare_b": 0, "is_swap": False, "sorted_num": 0, "low": 0, "high": max(0, len(data) - 1)})
+        if not history or history[-1].get("sorted_num", 0) != len(data):
+            history.append({"compare_a": 0, "compare_b": 0, "is_swap": False, "sorted_num": len(data), "low": 0, "high": max(0, len(data) - 1)})
+
+        return {
+            "history": history,
+            "initial_array": data,
+            "sorted_array": get_sorted_array(data, "quick"),
+            "direction": "quick",
+            "algo": "quick"
         }
     except Exception as e:
         traceback.print_exc()

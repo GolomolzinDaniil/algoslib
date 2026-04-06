@@ -29,6 +29,13 @@ const SORTING_META = {
         time: "Время: O((n + 1)!) в среднем",
         memory: "Память: О(n)",
         direction: "bogo"
+    },
+    quick: {
+        title: "Quick Sort",
+        desc: "Выбирает опорный элемент и делит массив на части, рекурсивно сортируя их",
+        time: "Время: O(n log n) в среднем, O(n²) в худшем",
+        memory: "Память: О(log n)",
+        direction: "quick"
     }
 };
 const MAX_SORT_ITEMS = 15;
