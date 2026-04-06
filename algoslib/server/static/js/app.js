@@ -25,6 +25,7 @@ const SORTING_META = {
     }
 };
 const MAX_SORT_ITEMS = 15;
+const MAX_SORT_VISUAL_ITEMS = 15;
 
 document.addEventListener('DOMContentLoaded', () => {
     initSortingPage();
@@ -35,7 +36,7 @@ function initSortingPage() {
     const header = document.getElementById('sort-header');
     if (header) {
         header.style.display = 'block';
-        document.getElementById('sort-title').textContent = '🔤 Сортировки';
+        document.getElementById('sort-title').textContent = 'Сортировки';
         document.getElementById('sort-desc').textContent = 'Выберите алгоритм и введите массив';
         document.getElementById('sort-time').textContent = '';
         document.getElementById('sort-memory').textContent = '';
@@ -54,6 +55,7 @@ function initSortingPage() {
     if (controls) controls.style.display = 'none';
 
     if (sortFileInput) sortFileInput.value = '';
+    uploadedSortData = null;
 }
 
 document.querySelectorAll('.tab').forEach(tab => {
@@ -83,7 +85,7 @@ document.getElementById('sort-algo').addEventListener('change', (e) => {
         renderSortInputPreview();
     } else {
         sortPlayer.el.controls.style.display = 'none';
-        document.getElementById('sort-title').textContent = '🔤 Сортировки';
+        document.getElementById('sort-title').textContent = 'Сортировки';
         document.getElementById('sort-desc').textContent = 'Выберите алгоритм и введите массив';
         document.getElementById('sort-time').textContent = '';
         document.getElementById('sort-memory').textContent = '';
@@ -114,6 +116,7 @@ const graphPlayer = createPlayer('graph');
 
 let graphData = { nodes: [], edges: [], algorithm: 'bfs' };
 let sortData = { history: [], initialArray: [], sortedArray: [] };
+let uploadedSortData = null;
 const sortPlot = document.getElementById('sort-plot');
 const sortDataInput = document.getElementById('sort-data');
 const sortFileInput = document.getElementById('sort-file');
@@ -139,7 +142,7 @@ function renderSortInputPreview() {
     const meta = SORTING_META[algo] || {};
     const direction = meta.direction || 'end';
 
-    renderSortingCells(sortPlot, data, -1, -1, 0, sortPlayer.speed, direction);
+    renderSortingCells(sortPlot, data, -1, -1, 0, sortPlayer.speed, direction, MAX_SORT_VISUAL_ITEMS);
 }
 
 function resetSortingSession() {
@@ -181,7 +184,8 @@ function applySortingResult(result, algo) {
         sortData.history[0]?.compare_b ?? 0,
         sortData.history[0]?.sorted_num ?? 0,
         sortPlayer.speed,
-        direction
+        direction,
+        MAX_SORT_VISUAL_ITEMS
     );
 
     sortPlayer.el.status.textContent = updateSortingStep(
@@ -190,13 +194,15 @@ function applySortingResult(result, algo) {
         sortData.initialArray,
         0,
         sortPlayer.speed,
-        direction
+        direction,
+        MAX_SORT_VISUAL_ITEMS
     );
 }
 
 if (sortDataInput) {
     sortDataInput.addEventListener('input', (e) => {
         const input = e.target;
+        uploadedSortData = null;
         const numbers = parseSortInput(input.value);
         let isClamped = false;
         if (numbers.length > MAX_SORT_ITEMS) {
@@ -224,19 +230,17 @@ if (sortFileInput) {
                 throw new Error('Файл не содержит чисел');
             }
 
-            const limitedNumbers = numbers.slice(0, MAX_SORT_ITEMS);
-            sortDataInput.value = limitedNumbers.join(', ');
+            uploadedSortData = numbers;
+            const previewNumbers = numbers.slice(0, MAX_SORT_VISUAL_ITEMS);
+            sortDataInput.value = previewNumbers.join(', ');
 
             resetSortingSession();
             renderSortInputPreview();
 
-            if (numbers.length > MAX_SORT_ITEMS) {
-                sortPlayer.el.status.textContent =
-                    `В файле больше ${MAX_SORT_ITEMS} чисел, взяты первые ${MAX_SORT_ITEMS}`;
-            } else {
-                sortPlayer.el.status.textContent = `Файл ${file.name} загружен`;
-            }
+            sortPlayer.el.status.textContent =
+                `Файл ${file.name} загружен: ${numbers.length} чисел. На странице отображаются первые ${MAX_SORT_VISUAL_ITEMS}`;
         } catch (error) {
+            uploadedSortData = null;
             sortPlayer.el.status.textContent = `Ошибка чтения файла: ${error.message}`;
         }
     });
@@ -282,12 +286,11 @@ if (sortDownloadFileBtn) {
 
 async function loadSortingData() {
     const raw = sortDataInput.value;
-    const data = parseSortInput(raw);
+    const data = Array.isArray(uploadedSortData) && uploadedSortData.length > 0
+        ? [...uploadedSortData]
+        : parseSortInput(raw);
     if (data.length === 0) {
         throw new Error('Введите числа через запятую');
-    }
-    if (data.length > MAX_SORT_ITEMS) {
-        throw new Error(`Можно ввести максимум ${MAX_SORT_ITEMS} чисел`);
     }
 
     const algo = document.getElementById('sort-algo').value;
@@ -367,7 +370,8 @@ function renderSortStep(idx) {
         sortData.initialArray,
         idx,
         sortPlayer.speed,
-        direction
+        direction,
+        MAX_SORT_VISUAL_ITEMS
     );
     sortPlayer.el.status.textContent = msg;
 }
