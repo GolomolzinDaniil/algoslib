@@ -167,6 +167,110 @@ function updateBogoStep(container, initialArray, step, stepIndex, totalSteps, sp
     return formatStatus(visibleData, step, stepIndex, totalSteps, initialArray.length);
 }
 
+function reconstructSwapState(initial, history, upTo) {
+    const values = [...initial];
+    const ids = values.map((_, index) => index);
+
+    for (let i = 1; i <= upTo; i++) {
+        const step = history[i];
+        if (!step || isInsertionStep(step) || isBogoStep(step) || !step.is_swap) continue;
+
+        const a = Number(step.compare_a);
+        const b = Number(step.compare_b);
+        if (!Number.isInteger(a) || !Number.isInteger(b)) continue;
+        if (a < 0 || b < 0 || a >= values.length || b >= values.length) continue;
+
+        [values[a], values[b]] = [values[b], values[a]];
+        [ids[a], ids[b]] = [ids[b], ids[a]];
+    }
+
+    return { values, ids };
+}
+
+function renderSwapCells(container, values, ids, compare_a, compare_b, sortedCount, speed, direction) {
+    container.innerHTML = '';
+    const transitionDuration = Math.max(120, Math.floor(speed * 0.45));
+
+    values.forEach((value, position) => {
+        const cell = document.createElement('div');
+        cell.dataset.sortId = String(ids[position]);
+        cell.style.order = String(position);
+        cell.style.transition = `transform ${speed}ms ease, background-color ${transitionDuration}ms ease`;
+        cell.className = `cell ${getCellColor(values.length, compare_a, compare_b, sortedCount, position, direction)}`;
+        applyCellValue(cell, value);
+        container.appendChild(cell);
+    });
+}
+
+function updateSwapStep(container, history, initialArray, step, stepIndex, speed, direction, maxVisible) {
+    const { values, ids } = reconstructSwapState(initialArray, history, stepIndex);
+    const visibleValues = values.slice(0, maxVisible);
+    const visibleIds = ids.slice(0, maxVisible);
+    const valueById = new Map(visibleIds.map((id, idx) => [id, visibleValues[idx]]));
+
+    const compare_a = Number.isInteger(step.compare_a) ? step.compare_a : -1;
+    const compare_b = Number.isInteger(step.compare_b) ? step.compare_b : -1;
+    const sortedCount = Number.isInteger(step.sorted_num) ? step.sorted_num : 0;
+    const transitionDuration = Math.max(120, Math.floor(speed * 0.45));
+
+    const existingCells = Array.from(container.querySelectorAll('.cell[data-sort-id]'));
+    const existingIds = existingCells.map((cell) => Number(cell.dataset.sortId));
+    const sameCells =
+        existingCells.length === visibleIds.length &&
+        visibleIds.every((id) => existingIds.includes(id));
+
+    if (!sameCells) {
+        renderSwapCells(container, visibleValues, visibleIds, compare_a, compare_b, sortedCount, speed, direction);
+        return formatStatus(visibleValues, step, stepIndex, history.length, values.length);
+    }
+
+    const oldRects = new Map();
+    existingCells.forEach((cell) => {
+        oldRects.set(cell.dataset.sortId, cell.getBoundingClientRect());
+    });
+
+    const nextOrder = new Map(visibleIds.map((id, position) => [String(id), position]));
+
+    existingCells.forEach((cell) => {
+        const key = cell.dataset.sortId;
+        const position = nextOrder.get(key);
+        if (position === undefined) return;
+
+        cell.style.order = String(position);
+        cell.style.transition = `transform ${speed}ms ease, background-color ${transitionDuration}ms ease`;
+        cell.className = `cell ${getCellColor(values.length, compare_a, compare_b, sortedCount, position, direction)}`;
+        applyCellValue(cell, valueById.get(Number(key)));
+    });
+
+    const newRects = new Map();
+    existingCells.forEach((cell) => {
+        newRects.set(cell.dataset.sortId, cell.getBoundingClientRect());
+    });
+
+    existingCells.forEach((cell) => {
+        const key = cell.dataset.sortId;
+        const oldRect = oldRects.get(key);
+        const newRect = newRects.get(key);
+        if (!oldRect || !newRect) return;
+
+        const dx = oldRect.left - newRect.left;
+        const dy = oldRect.top - newRect.top;
+        if (dx === 0 && dy === 0) return;
+
+        cell.style.transition = 'none';
+        cell.style.transform = `translate(${dx}px, ${dy}px)`;
+    });
+
+    container.getBoundingClientRect();
+
+    existingCells.forEach((cell) => {
+        cell.style.transition = `transform ${speed}ms ease, background-color ${transitionDuration}ms ease`;
+        cell.style.transform = 'translate(0, 0)';
+    });
+
+    return formatStatus(visibleValues, step, stepIndex, history.length, values.length);
+}
+
 function reconstructInsertionState(initial, history, upTo) {
     const values = [...initial];
     const ids = values.map((_, index) => index);
@@ -329,31 +433,7 @@ export function updateSortingStep(
     if (direction === 'insertion' || isInsertionStep(step)) {
         return updateInsertionStep(container, history, initialArray, stepIndex, speed, maxVisible);
     }
-
-    const data = reconstructArray(initialArray, history, stepIndex);
-    const { compare_a, compare_b, sorted_num: sortedCount } = step;
-    const visibleData = data.slice(0, maxVisible);
-    const safeSortedCount = sortedCount ?? 0;
-
-    const cells = container.querySelectorAll('.cell');
-    if (cells.length !== visibleData.length) {
-        renderSortingCells(container, data, compare_a, compare_b, sortedCount, speed, direction, maxVisible);
-        return formatStatus(visibleData, step, stepIndex, history.length, data.length);
-    }
-
-    visibleData.forEach((val, i) => {
-        const cell = cells[i];
-        if (!cell) return;
-        applyCellValue(cell, val);
-        cell.className = `cell ${getCellColor(data.length, compare_a, compare_b, safeSortedCount, i, direction)}`;
-
-        if (i === compare_a || i === compare_b) {
-            cell.style.transform = 'scale(1.1)';
-            setTimeout(() => { cell.style.transform = 'scale(1)'; }, speed);
-        }
-    });
-
-    return formatStatus(visibleData, step, stepIndex, history.length, data.length);
+    return updateSwapStep(container, history, initialArray, step, stepIndex, speed, direction, maxVisible);
 }
 
 function reconstructArray(initial, history, upTo) {
