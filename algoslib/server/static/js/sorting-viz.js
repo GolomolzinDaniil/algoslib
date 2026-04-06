@@ -1,6 +1,7 @@
 export function getCellColor(len, compare_a, compare_b, sortedCount, idx, direction = 'end') {
     if (sortedCount >= len) return 'green';
     if (direction === 'start' && idx === compare_b) return 'yellow';
+    if (direction === 'insertion' && idx === compare_b) return 'yellow';
     if (idx === compare_a || idx === compare_b) return 'red';
 
     if (sortedCount > 0) {
@@ -51,6 +52,11 @@ function applyCellValue(cell, value) {
 
 function isBogoStep(step) {
     return Array.isArray(step?.indexes);
+}
+
+function isInsertionStep(step) {
+    return Object.prototype.hasOwnProperty.call(step ?? {}, 'is_shift')
+        && Object.prototype.hasOwnProperty.call(step ?? {}, 'value');
 }
 
 function getBogoStepColor(step, stepIndex) {
@@ -161,6 +167,126 @@ function updateBogoStep(container, initialArray, step, stepIndex, totalSteps, sp
     return formatStatus(visibleData, step, stepIndex, totalSteps, initialArray.length);
 }
 
+function reconstructInsertionState(initial, history, upTo) {
+    const values = [...initial];
+    const ids = values.map((_, index) => index);
+
+    let currentIteration = 1;
+    let keyId = currentIteration < ids.length ? ids[currentIteration] : null;
+
+    for (let i = 1; i <= upTo; i++) {
+        const step = history[i];
+        if (!isInsertionStep(step)) continue;
+
+        const from = Number(step.compare_a);
+        const to = Number(step.compare_b);
+        if (!Number.isInteger(to) || to < 0 || to >= values.length) continue;
+
+        if (step.is_shift) {
+            if (Number.isInteger(from) && from >= 0 && from < values.length) {
+                values[to] = values[from];
+                ids[to] = ids[from];
+            } else {
+                values[to] = step.value;
+            }
+            continue;
+        }
+
+        values[to] = step.value;
+        if (keyId !== null) {
+            ids[to] = keyId;
+        }
+
+        currentIteration += 1;
+        keyId = currentIteration < ids.length ? ids[currentIteration] : null;
+    }
+
+    return { values, ids };
+}
+
+function renderInsertionCells(container, values, ids, compare_a, compare_b, sortedCount, speed) {
+    container.innerHTML = '';
+    values.forEach((value, position) => {
+        const cell = document.createElement('div');
+        cell.dataset.insertionId = String(ids[position]);
+        cell.style.order = String(position);
+        cell.style.transition = `transform ${speed}ms ease, background-color ${Math.max(120, Math.floor(speed * 0.45))}ms ease`;
+        cell.className = `cell ${getCellColor(values.length, compare_a, compare_b, sortedCount, position, 'insertion')}`;
+        applyCellValue(cell, value);
+        container.appendChild(cell);
+    });
+}
+
+function updateInsertionStep(container, history, initialArray, stepIndex, speed, maxVisible) {
+    const step = history[stepIndex] ?? {};
+    const { values, ids } = reconstructInsertionState(initialArray, history, stepIndex);
+    const visibleValues = values.slice(0, maxVisible);
+    const visibleIds = ids.slice(0, maxVisible);
+    const valueById = new Map(visibleIds.map((id, idx) => [id, visibleValues[idx]]));
+
+    const compare_a = Number.isInteger(step.compare_a) ? step.compare_a : -1;
+    const compare_b = Number.isInteger(step.compare_b) ? step.compare_b : -1;
+    const sortedCount = Number.isInteger(step.sorted_num) ? step.sorted_num : 0;
+    const transitionDuration = Math.max(120, Math.floor(speed * 0.45));
+
+    const existingCells = Array.from(container.querySelectorAll('.cell[data-insertion-id]'));
+    const existingIds = existingCells.map((cell) => Number(cell.dataset.insertionId));
+    const sameCells =
+        existingCells.length === visibleIds.length &&
+        visibleIds.every((id) => existingIds.includes(id));
+
+    if (!sameCells) {
+        renderInsertionCells(container, visibleValues, visibleIds, compare_a, compare_b, sortedCount, speed);
+        return formatStatus(visibleValues, step, stepIndex, history.length, values.length);
+    }
+
+    const oldRects = new Map();
+    existingCells.forEach((cell) => {
+        oldRects.set(cell.dataset.insertionId, cell.getBoundingClientRect());
+    });
+
+    const nextOrder = new Map(visibleIds.map((id, position) => [String(id), position]));
+
+    existingCells.forEach((cell) => {
+        const key = cell.dataset.insertionId;
+        const position = nextOrder.get(key);
+        if (position === undefined) return;
+
+        cell.style.order = String(position);
+        cell.style.transition = `transform ${speed}ms ease, background-color ${transitionDuration}ms ease`;
+        cell.className = `cell ${getCellColor(values.length, compare_a, compare_b, sortedCount, position, 'insertion')}`;
+        applyCellValue(cell, valueById.get(Number(key)));
+    });
+
+    const newRects = new Map();
+    existingCells.forEach((cell) => {
+        newRects.set(cell.dataset.insertionId, cell.getBoundingClientRect());
+    });
+
+    existingCells.forEach((cell) => {
+        const key = cell.dataset.insertionId;
+        const oldRect = oldRects.get(key);
+        const newRect = newRects.get(key);
+        if (!oldRect || !newRect) return;
+
+        const dx = oldRect.left - newRect.left;
+        const dy = oldRect.top - newRect.top;
+        if (dx === 0 && dy === 0) return;
+
+        cell.style.transition = 'none';
+        cell.style.transform = `translate(${dx}px, ${dy}px)`;
+    });
+
+    container.getBoundingClientRect();
+
+    existingCells.forEach((cell) => {
+        cell.style.transition = `transform ${speed}ms ease, background-color ${transitionDuration}ms ease`;
+        cell.style.transform = 'translate(0, 0)';
+    });
+
+    return formatStatus(visibleValues, step, stepIndex, history.length, values.length);
+}
+
 export function renderSortingCells(
     container,
     data,
@@ -200,6 +326,10 @@ export function updateSortingStep(
         return updateBogoStep(container, initialArray, step, stepIndex, history.length, speed, maxVisible);
     }
 
+    if (direction === 'insertion' || isInsertionStep(step)) {
+        return updateInsertionStep(container, history, initialArray, stepIndex, speed, maxVisible);
+    }
+
     const data = reconstructArray(initialArray, history, stepIndex);
     const { compare_a, compare_b, sorted_num: sortedCount } = step;
     const visibleData = data.slice(0, maxVisible);
@@ -235,9 +365,27 @@ function reconstructArray(initial, history, upTo) {
 
     const data = [...initial];
     for (let i = 1; i <= upTo; i++) {
-        if (history[i].is_swap) {
-            [data[history[i].compare_a], data[history[i].compare_b]] =
-                [data[history[i].compare_b], data[history[i].compare_a]];
+        const currentStep = history[i];
+        if (isInsertionStep(currentStep)) {
+            const from = Number(currentStep.compare_a);
+            const to = Number(currentStep.compare_b);
+            if (!Number.isInteger(to) || to < 0 || to >= data.length) continue;
+
+            if (currentStep.is_shift) {
+                const shiftedValue =
+                    Number.isInteger(from) && from >= 0 && from < data.length
+                        ? data[from]
+                        : currentStep.value;
+                data[to] = shiftedValue;
+            } else {
+                data[to] = currentStep.value;
+            }
+            continue;
+        }
+
+        if (currentStep.is_swap) {
+            [data[currentStep.compare_a], data[currentStep.compare_b]] =
+                [data[currentStep.compare_b], data[currentStep.compare_a]];
         }
     }
     return data;
@@ -259,6 +407,13 @@ export function formatStatus(data, step, idx, total, sourceLength = data.length)
             return `❌ Лимит перемешиваний достигнут, порядок не найден${previewSuffix}`;
         }
         return `❌ Перемешивание ${idx}: пока не отсортировано${previewSuffix}`;
+    }
+
+    if (isInsertionStep(step)) {
+        if (step.is_shift) {
+            return `↪ Сдвиг: ${step.value} из ${step.compare_a} в ${step.compare_b}${previewSuffix}`;
+        }
+        return `📌 Вставка: ${step.value} в позицию ${step.compare_b}${previewSuffix}`;
     }
 
     if (idx === 0) {

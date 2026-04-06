@@ -17,6 +17,7 @@ selection_sort_h = getattr(sub_sorting_cpp, "selection_sort_h", None) if sub_sor
 gnome_sort_h = getattr(sub_sorting_cpp, "gnome_sort_h", None) if sub_sorting_cpp else None
 bogo_sort_h = getattr(sub_sorting_cpp, "bogo_sort_h", None) if sub_sorting_cpp else None
 quick_sort_h = getattr(sub_sorting_cpp, "quick_sort_h", None) if sub_sorting_cpp else None
+insertion_sort_h = getattr(sub_sorting_cpp, "insertion_sort_h", None) if sub_sorting_cpp else None
 
 
 router = APIRouter()
@@ -234,6 +235,36 @@ def quick_sort_history_py(data: list[float | int]) -> list[dict]:
     return history
 
 
+def insertion_sort_history_py(data: list[float | int]) -> list[dict]:
+    arr = list(data)
+    size = len(arr)
+    history: list[dict] = []
+
+    for i in range(1, size):
+        curr_el = arr[i]
+        curr_ind = i
+
+        while curr_ind > 0 and arr[curr_ind - 1] > curr_el:
+            history.append({
+                "compare_a": curr_ind - 1,
+                "compare_b": curr_ind,
+                "is_shift": True,
+                "value": arr[curr_ind - 1],
+            })
+            arr[curr_ind] = arr[curr_ind - 1]
+            curr_ind -= 1
+
+        history.append({
+            "compare_a": i,
+            "compare_b": curr_ind,
+            "is_shift": False,
+            "value": curr_el,
+        })
+        arr[curr_ind] = curr_el
+
+    return history
+
+
 def normalize_sort_step(step: dict, algo: str) -> dict:
     if algo == "bubble":
         return {
@@ -272,6 +303,13 @@ def normalize_sort_step(step: dict, algo: str) -> dict:
             "sorted_num": int(step.get("sorted_num", 0)),
             "low": int(step.get("low", 0)),
             "high": int(step.get("high", 0)),
+        }
+    elif algo == "insertion":
+        return {
+            "compare_a": int(step.get("compare_a", 0)),
+            "compare_b": int(step.get("compare_b", 0)),
+            "is_shift": bool(step.get("is_shift", False)),
+            "value": step.get("value"),
         }
     return step
 
@@ -429,6 +467,36 @@ async def run_quick_sort(req: SortRequest):
             "sorted_array": get_sorted_array(data, "quick"),
             "direction": "quick",
             "algo": "quick"
+        }
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
+@router.post("/insertion")
+async def run_insertion_sort(req: SortRequest):
+    try:
+        data = list(req.data)
+        if insertion_sort_h is not None and can_use_cpp_binding(data):
+            arr = list(data)
+            try:
+                raw_history = insertion_sort_h(arr)
+                history = [normalize_sort_step(dict(s), algo="insertion") for s in raw_history]
+            except Exception:
+                history = insertion_sort_history_py(data)
+        else:
+            history = insertion_sort_history_py(data)
+
+        # Start and finish marker steps for unified player/status behavior.
+        history.insert(0, {"compare_a": -1, "compare_b": -1, "is_swap": False, "sorted_num": 0})
+        history.append({"compare_a": 0, "compare_b": 0, "is_swap": False, "sorted_num": len(data)})
+
+        return {
+            "history": history,
+            "initial_array": data,
+            "sorted_array": get_sorted_array(data, "insertion"),
+            "direction": "insertion",
+            "algo": "insertion"
         }
     except Exception as e:
         traceback.print_exc()

@@ -36,6 +36,13 @@ const SORTING_META = {
         time: "Время: O(n log n) в среднем, O(n²) в худшем",
         memory: "Память: О(log n)",
         direction: "quick"
+    },
+    insertion: {
+        title: "Insertion Sort",
+        desc: "Сдвигает элементы вправо и вставляет текущий элемент в подходящую позицию",
+        time: "Время: O(n²)",
+        memory: "Память: О(1)",
+        direction: "insertion"
     }
 };
 const MAX_SORT_ITEMS = 15;
