@@ -141,6 +141,7 @@ let uploadedSortData = null;
 const sortPlot = document.getElementById('sort-plot');
 const sortDataInput = document.getElementById('sort-data');
 const sortFileInput = document.getElementById('sort-file');
+const sortFileName = document.getElementById('sort-file-name');
 const sortDownloadFileBtn = document.getElementById('sort-download-file');
 
 function parseSortInput(raw) {
@@ -148,6 +149,11 @@ function parseSortInput(raw) {
         .split(/[\s,;]+/)
         .map(part => parseFloat(part.trim()))
         .filter(value => !Number.isNaN(value));
+}
+
+function setSortFileNameLabel(fileName = '') {
+    if (!sortFileName) return;
+    sortFileName.textContent = fileName || 'Файл не выбран';
 }
 
 function renderSortInputPreview() {
@@ -247,7 +253,12 @@ if (sortDataInput) {
 if (sortFileInput) {
     sortFileInput.addEventListener('change', async (e) => {
         const file = e.target.files?.[0];
-        if (!file) return;
+        if (!file) {
+            setSortFileNameLabel('');
+            return;
+        }
+
+        setSortFileNameLabel(file.name);
 
         try {
             const text = await file.text();

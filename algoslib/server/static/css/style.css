@@ -108,6 +108,11 @@ body {
     margin-bottom: 0;
 }
 
+.file-upload-row {
+    flex-wrap: nowrap;
+    width: min(560px, 100%);
+}
+
 .input-row label {
     font-size: 14px;
     font-weight: 500;
@@ -124,7 +129,6 @@ body {
 
 input[type="text"],
 input[type="number"],
-input[type="file"],
 textarea,
 select {
     -webkit-appearance: none;
@@ -142,7 +146,6 @@ select {
 
 input[type="text"]:focus,
 input[type="number"]:focus,
-input[type="file"]:focus,
 textarea:focus,
 select:focus {
     border-color: var(--accent);
@@ -154,43 +157,106 @@ input[type="text"] {
     min-width: 200px;
 }
 
-input[type="file"] {
+.file-input-wrapper {
+    position: relative;
     min-width: 240px;
-    cursor: pointer;
+    height: 44px;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    background: var(--input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-input[type="file"]::file-selector-button,
-input[type="file"]::-webkit-file-upload-button {
+.file-input-wrapper:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(178, 201, 238, 0.2);
+}
+
+.file-input-wrapper input[type="file"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.file-input-action {
+    height: 100%;
+    padding: 0 10px;
+    display: inline-flex;
+    align-items: center;
     background: var(--border);
     color: var(--text);
-    border: 1px solid var(--hover);
-    border-radius: calc(var(--radius-lg) - 2px);
-    padding: 8px 12px;
-    margin-right: 10px;
+    border-right: 1px solid var(--hover);
     font-family: inherit;
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 400;
+    line-height: 1;
     cursor: pointer;
+    user-select: none;
     transform: scale(1);
     transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
 
-input[type="file"]::file-selector-button:hover,
-input[type="file"]::-webkit-file-upload-button:hover {
+.file-input-action:hover {
     background: var(--hover);
     transform: scale(1.03);
     box-shadow: 0 0 0 3px rgba(178, 201, 238, 0.12);
 }
 
+.file-input-download {
+    width: 44px;
+    height: 100%;
+    flex: 0 0 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--border);
+    color: var(--text);
+    border: 0;
+    border-left: 1px solid var(--hover);
+    font-family: inherit;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.file-input-download:hover {
+    background: var(--hover);
+}
+
+.file-input-name {
+    min-width: 0;
+    padding: 0 10px;
+    flex: 1;
+    font-size: 14px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+}
+
 #sort-download-file {
-    transform: scale(1);
-    transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+    transition: background-color 0.2s ease;
+}
+
+#sort-download-file svg {
+    width: 16px;
+    height: 16px;
 }
 
 #sort-download-file:hover {
     background: var(--hover);
-    transform: scale(1.03);
-    box-shadow: 0 0 0 3px rgba(178, 201, 238, 0.12);
 }
 
 textarea {
@@ -429,6 +495,7 @@ input[type="range"] {
 
     input[type="text"],
     select,
+    .file-input-wrapper,
     .btn {
         width: 100%;
         justify-content: center;
