@@ -1,5 +1,6 @@
 export function getCellColor(len, compare_a, compare_b, sortedCount, idx, direction = 'end') {
     if (sortedCount >= len) return 'green';
+    if (direction === 'start' && idx === compare_b) return 'yellow';
     if (idx === compare_a || idx === compare_b) return 'red';
 
     if (sortedCount > 0) {
