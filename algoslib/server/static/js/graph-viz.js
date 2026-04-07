@@ -38,17 +38,18 @@ function getNodeLabel(nodeId, nodeLabels = {}) {
 
 export function renderGraph(svg, nodes, edges, weighted, nodeLabels = {}) {
     positions = forceLayout(nodes, edges, W, H, currentSpacing);
-    draw(svg, nodes, edges, weighted, {}, [], null, null, nodeLabels);
+    draw(svg, nodes, edges, weighted, {}, [], null, null, nodeLabels, null);
 }
 
 export function updateGraphStep(svg, nodes, edges, step, algorithm, nodeLabels = {}) {
-    const weighted = algorithm === 'dijkstra' || algorithm === 'bellman_ford';
+    const weighted = algorithm === 'dijkstra' || algorithm === 'bellman_ford' || algorithm === 'kruskal';
     const visited = new Set(step.visited || []);
     const inQueue = new Set(step.queue || []);
     const current = step.current_node !== undefined ? step.current_node : null;
 
     let activeEdge = null;
     let relaxedEdge = null;
+    let mstEdgeSet = null;
 
     if (algorithm === 'bellman_ford') {
         activeEdge = [step.edge_from, step.edge_to];
@@ -57,9 +58,33 @@ export function updateGraphStep(svg, nodes, edges, step, algorithm, nodeLabels =
         }
     }
 
+    if (algorithm === 'kruskal') {
+        activeEdge = [step.edge_from, step.edge_to];
+        if (step.accepted) {
+            relaxedEdge = [step.edge_from, step.edge_to];
+        }
+        // Собираем множество MST-рёбер для подсветки
+        mstEdgeSet = new Set();
+        for (const e of (step.mst_edges || [])) {
+            mstEdgeSet.add(`${e[0]}-${e[1]}`);
+            mstEdgeSet.add(`${e[1]}-${e[0]}`);
+        }
+    }
+
     const nodeColors = {};
     for (const n of nodes) {
-        if (algorithm === 'bellman_ford') {
+        if (algorithm === 'kruskal') {
+            if (n === step.edge_from || n === step.edge_to) {
+                nodeColors[n] = step.accepted ? COLORS.visited : COLORS.current;
+            } else {
+                // Подсвечиваем вершины, входящие в MST
+                let inMst = false;
+                for (const e of (step.mst_edges || [])) {
+                    if (e[0] === n || e[1] === n) { inMst = true; break; }
+                }
+                nodeColors[n] = inMst ? COLORS.visited : COLORS.defaultNode;
+            }
+        } else if (algorithm === 'bellman_ford') {
             if (n === step.edge_from) nodeColors[n] = COLORS.current;
             else if (visited.has(n)) nodeColors[n] = COLORS.visited;
             else nodeColors[n] = COLORS.defaultNode;
@@ -80,7 +105,8 @@ export function updateGraphStep(svg, nodes, edges, step, algorithm, nodeLabels =
         step.distances || {},
         activeEdge,
         relaxedEdge,
-        nodeLabels
+        nodeLabels,
+        mstEdgeSet
     );
     return formatInfo(step, algorithm, nodeLabels);
 }
@@ -130,7 +156,7 @@ function forceLayout(nodes, edges, w, h, spacing) {
     return pos;
 }
 
-function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, relaxedEdge, nodeLabels = {}) {
+function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, relaxedEdge, nodeLabels = {}, mstEdgeSet = null) {
     let html = '';
 
     for (const edge of edges) {
@@ -148,6 +174,9 @@ function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, re
         } else if (activeEdge && activeEdge[0] === u && activeEdge[1] === v) {
             color = COLORS.activeEdge;
             strokeWidth = 4;
+        } else if (mstEdgeSet && (mstEdgeSet.has(`${u}-${v}`) || mstEdgeSet.has(`${v}-${u}`))) {
+            color = COLORS.relaxedEdge;
+            strokeWidth = 3.5;
         }
 
         html += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}"
@@ -189,7 +218,17 @@ function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, re
 function formatInfo(step, algorithm, nodeLabels = {}) {
     const lines = [];
 
-    if (algorithm === 'bellman_ford') {
+    if (algorithm === 'kruskal') {
+        lines.push(
+            `<span class="label">Ребро:</span> <span class="value">${getNodeLabel(step.edge_from, nodeLabels)} — ${getNodeLabel(step.edge_to, nodeLabels)} (вес: ${step.edge_weight})</span>`
+        );
+        lines.push(`<span class="label">Принято в MST:</span> <span class="value">${step.accepted ? 'Да' : 'Нет (цикл)'}</span>`);
+        const mstLabels = (step.mst_edges || [])
+            .map(e => `${getNodeLabel(e[0], nodeLabels)}—${getNodeLabel(e[1], nodeLabels)}`)
+            .join(', ');
+        lines.push(`<span class="label">Рёбра MST:</span> <span class="value">[${mstLabels}]</span>`);
+        lines.push(`<span class="label">Вес MST:</span> <span class="value">${step.total_weight}</span>`);
+    } else if (algorithm === 'bellman_ford') {
         lines.push(`<span class="label">Итерация:</span> <span class="value">${step.iteration}</span>`);
         lines.push(
             `<span class="label">Ребро:</span> <span class="value">${getNodeLabel(step.edge_from, nodeLabels)} → ${getNodeLabel(step.edge_to, nodeLabels)}</span>`

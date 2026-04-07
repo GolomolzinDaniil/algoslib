@@ -23,6 +23,10 @@ class BellmanFordRequest(BaseModel):
     start_node: str
 
 
+class KruskalRequest(BaseModel):
+    edges: list[list[str]]
+
+
 def _normalize_label(value: str) -> str:
     label = str(value).strip()
     if not label:
@@ -49,6 +53,21 @@ def _build_label_maps(edges: list[list[str]], start_node: str) -> tuple[dict[str
 
     node_labels = {str(node_id): label for label, node_id in label_to_id.items()}
     return label_to_id, node_labels, start_label
+
+
+def _build_label_maps_no_start(edges: list[list[str]]) -> tuple[dict[str, int], dict[str, str]]:
+    label_to_id: dict[str, int] = {}
+
+    for edge in edges:
+        if len(edge) < 2:
+            raise ValueError("Каждое ребро должно содержать как минимум две ноды.")
+        for raw_label in edge[:2]:
+            label = _normalize_label(raw_label)
+            if label not in label_to_id:
+                label_to_id[label] = len(label_to_id)
+
+    node_labels = {str(node_id): label for label, node_id in label_to_id.items()}
+    return label_to_id, node_labels
 
 
 def _parse_unweighted_edges(edges: list[list[str]], label_to_id: dict[str, int]) -> list[list[int]]:
@@ -199,6 +218,59 @@ async def run_bellman_ford(req: BellmanFordRequest):
                 "edge_to": int(step.edge_to),
                 "relaxed": bool(step.relaxed),
                 "distances": distances,
+            })
+
+        return {
+            "steps": result_steps,
+            "edges": parsed_edges,
+            "nodes": sorted(nodes),
+            "node_labels": node_labels,
+        }
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
+@router.post("/kruskal")
+async def run_kruskal(req: KruskalRequest):
+    try:
+        from algoslib.graphs import Weighted_Graph, kruskal
+
+        if kruskal is None:
+            raise HTTPException(
+                status_code=501,
+                detail="Kruskal недоступен. Пересоберите sub_graphs.",
+            )
+
+        label_to_id, node_labels = _build_label_maps_no_start(req.edges)
+        parsed_edges = _parse_weighted_edges(req.edges, label_to_id)
+
+        graph = Weighted_Graph()
+        nodes = set()
+        for u, v, w in parsed_edges:
+            graph.add_edge(u, v, w)
+            nodes.add(u)
+            nodes.add(v)
+
+        steps = kruskal(graph)
+
+        result_steps = []
+        for step in steps:
+            mst_edges = []
+            for e in step.mst_edges:
+                mst_edges.append([int(e[0]), int(e[1]), float(e[2])])
+            result_steps.append({
+                "edge_from": int(step.edge_from),
+                "edge_to": int(step.edge_to),
+                "edge_weight": float(step.edge_weight),
+                "accepted": bool(step.accepted),
+                "mst_edges": mst_edges,
+                "total_weight": float(step.total_weight),
+                "components": {str(k): int(v) for k, v in step.components.items()},
             })
 
         return {

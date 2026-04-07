@@ -292,3 +292,126 @@ def test_bellman_ford_vs_dijkstra_consistency():
             assert dj_final[node] == float('inf')
         else:
             assert abs(bf_final[node] - dj_final[node]) < 1e-9
+
+
+# ================= Тесты для алгоритма Краскала =================
+
+def test_kruskal_simple():
+    """Простой граф: 0 --1.0-- 1 --2.0-- 2"""
+    g = Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    g.add_edge(1, 2, 2.0)
+
+    steps = kruskal(g)
+
+    assert len(steps) == 2
+    # Оба ребра должны быть приняты (MST = весь граф)
+    assert all(step.accepted for step in steps)
+    assert abs(steps[-1].total_weight - 3.0) < 1e-9
+
+
+def test_kruskal_step_type():
+    """Проверка типа возвращаемых шагов."""
+    g = Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    steps = kruskal(g)
+    assert all(isinstance(s, Kruskal_Step) for s in steps)
+
+
+def test_kruskal_with_cycle():
+    """
+    Граф с циклом — Краскал должен отклонить одно ребро:
+    0 --1.0-- 1
+    1 --2.0-- 2
+    0 --3.0-- 2  (создаёт цикл, должно быть отклонено)
+    """
+    g = Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    g.add_edge(1, 2, 2.0)
+    g.add_edge(0, 2, 3.0)
+
+    steps = kruskal(g)
+
+    assert len(steps) == 3
+    accepted = [s for s in steps if s.accepted]
+    rejected = [s for s in steps if not s.accepted]
+    assert len(accepted) == 2  # |V| - 1 = 2 ребра в MST
+    assert len(rejected) == 1  # одно ребро отклонено (цикл)
+    assert abs(steps[-1].total_weight - 3.0) < 1e-9  # 1.0 + 2.0
+
+
+def test_kruskal_mst_weight():
+    """
+    Проверка суммарного веса MST:
+    0 --4-- 1
+    0 --2-- 2
+    1 --1-- 2
+    1 --5-- 3
+    2 --8-- 3
+    MST: (1,2,1), (0,2,2), (1,3,5) => вес = 8
+    """
+    g = Weighted_Graph()
+    g.add_edge(0, 1, 4.0)
+    g.add_edge(0, 2, 2.0)
+    g.add_edge(1, 2, 1.0)
+    g.add_edge(1, 3, 5.0)
+    g.add_edge(2, 3, 8.0)
+
+    steps = kruskal(g)
+
+    accepted = [s for s in steps if s.accepted]
+    assert len(accepted) == 3  # |V| - 1 = 3
+    assert abs(steps[-1].total_weight - 8.0) < 1e-9
+
+
+def test_kruskal_edge_order():
+    """Проверка, что рёбра рассматриваются в порядке возрастания веса."""
+    g = Weighted_Graph()
+    g.add_edge(0, 1, 5.0)
+    g.add_edge(1, 2, 1.0)
+    g.add_edge(0, 2, 3.0)
+
+    steps = kruskal(g)
+
+    weights = [s.edge_weight for s in steps]
+    assert weights == sorted(weights)
+
+
+def test_kruskal_disconnected():
+    """Граф с двумя компонентами — MST не объединяет их."""
+    g = Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    g.add_edge(2, 3, 2.0)
+
+    steps = kruskal(g)
+
+    accepted = [s for s in steps if s.accepted]
+    assert len(accepted) == 2  # по одному ребру на каждую компоненту
+    assert abs(steps[-1].total_weight - 3.0) < 1e-9
+
+
+def test_kruskal_float_weights():
+    """Проверка работы с дробными весами."""
+    g = Weighted_Graph()
+    g.add_edge(0, 1, 0.1)
+    g.add_edge(1, 2, 0.2)
+    g.add_edge(0, 2, 0.5)
+
+    steps = kruskal(g)
+
+    accepted = [s for s in steps if s.accepted]
+    assert len(accepted) == 2
+    assert abs(steps[-1].total_weight - 0.3) < 1e-9
+
+
+def test_kruskal_components():
+    """Проверка, что components содержит корректные id компонент."""
+    g = Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    g.add_edge(1, 2, 2.0)
+
+    steps = kruskal(g)
+
+    # После последнего шага все вершины должны быть в одной компоненте
+    final_components = steps[-1].components
+    assert len(set(final_components.values())) == 1

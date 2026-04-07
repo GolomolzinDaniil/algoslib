@@ -5,6 +5,7 @@
 #include "graph_utils.hpp"
 #include "dijkstra.hpp"
 #include "bellman_ford.hpp"
+#include "kruskal.hpp"
 
 namespace py = pybind11;
 
@@ -62,9 +63,33 @@ PYBIND11_MODULE(sub_graphs, m) {
                       "Словарь {node_id: текущее расстояние} (float)");
 
     // Функция bellman_ford
-    m.def("bellman_ford", 
+    m.def("bellman_ford",
           &bellman_ford,
           py::arg("graph"), py::arg("start_node"),
           "Алгоритм Беллмана-Форда. Возвращает список шагов (List[Ford_Step]). "
           "Поддерживает рёбра с отрицательным весом.");
+
+    // Структура шага алгоритма Краскала
+    py::class_<Kruskal_Step>(m, "Kruskal_Step")
+        .def_readonly("edge_from", &Kruskal_Step::edge_from,
+                      "Исходная вершина рассматриваемого ребра")
+        .def_readonly("edge_to", &Kruskal_Step::edge_to,
+                      "Целевая вершина рассматриваемого ребра")
+        .def_readonly("edge_weight", &Kruskal_Step::edge_weight,
+                      "Вес рассматриваемого ребра")
+        .def_readonly("accepted", &Kruskal_Step::accepted,
+                      "Было ли ребро принято в MST (bool)")
+        .def_readonly("mst_edges", &Kruskal_Step::mst_edges,
+                      "Текущие рёбра MST: List[Tuple[int, int, float]]")
+        .def_readonly("total_weight", &Kruskal_Step::total_weight,
+                      "Текущий суммарный вес MST")
+        .def_readonly("components", &Kruskal_Step::components,
+                      "Словарь {node_id: component_id}");
+
+    // Функция kruskal
+    m.def("kruskal",
+          &kruskal,
+          py::arg("graph"),
+          "Алгоритм Краскала. Возвращает список шагов (List[Kruskal_Step]). "
+          "Строит минимальное остовное дерево.");
 }
