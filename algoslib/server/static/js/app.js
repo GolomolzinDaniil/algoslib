@@ -621,3 +621,12 @@ function wireControls(player, renderFn) {
 }
 
 wireControls(graphPlayer, renderGraphStepAt);
+
+graphPlayer.el.play.addEventListener('click', () => {
+    if (graphPlayer.steps.length === 0) return;
+    if (graphPlayer.playing) {
+        stopPlayer(graphPlayer);
+    } else {
+        startPlayer(graphPlayer, renderGraphStepAt);
+    }
+});
