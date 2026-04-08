@@ -1,5 +1,5 @@
 import { renderSortingCells, updateSortingStep } from './sorting-viz.js';
-import { renderGraph, updateGraphStep } from './graph-viz.js';
+import { renderGraph, updateGraphStep, setSpacing } from './graph-viz.js';
 
 const SORTING_META = {
     bubble: {
@@ -135,7 +135,7 @@ function createPlayer(prefix) {
 const sortPlayer = createPlayer('sort');
 const graphPlayer = createPlayer('graph');
 
-let graphData = { nodes: [], edges: [], algorithm: 'bfs' };
+let graphData = { nodes: [], edges: [], algorithm: 'bfs', nodeLabels: {} };
 let sortData = { history: [], initialArray: [], sortedArray: [] };
 let uploadedSortData = null;
 const sortPlot = document.getElementById('sort-plot');
@@ -416,13 +416,35 @@ function renderSortStep(idx) {
 const graphSvg = document.getElementById('graph-svg');
 const graphInfo = document.getElementById('graph-info');
 
+const spacingSlider = document.getElementById('graph-spacing');
+const spacingVal   = document.getElementById('graph-spacing-val');
+spacingSlider.addEventListener('input', () => {
+    spacingVal.textContent = spacingSlider.value;
+    setSpacing(Number(spacingSlider.value));
+    if (graphData) {
+        const algo = graphData.algorithm;
+        const weighted = algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal';
+        renderGraph(graphSvg, graphData.nodes, graphData.edges, weighted, graphData.nodeLabels);
+        if (graphPlayer.steps.length) renderGraphStepAt(graphPlayer.current);
+    }
+});
+
 document.getElementById('graph-algo').addEventListener('change', (e) => {
     const label = document.getElementById('edges-label');
     const algo = e.target.value;
-    if (algo === 'dijkstra' || algo === 'bellman_ford') {
+    if (algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal') {
         label.textContent = 'Рёбра (по одному на строке: u v вес):';
     } else {
         label.textContent = 'Рёбра (по одному на строке: u v):';
+    }
+
+    const startInput = document.getElementById('graph-start');
+    if (algo === 'kruskal') {
+        startInput.disabled = true;
+        startInput.placeholder = 'Не требуется';
+    } else {
+        startInput.disabled = false;
+        startInput.placeholder = 'A';
     }
 });
 
@@ -430,17 +452,53 @@ document.getElementById('graph-example').addEventListener('click', () => {
     const algo = document.getElementById('graph-algo').value;
     if (algo === 'dijkstra') {
         document.getElementById('graph-edges').value = '0 1 4\n0 2 1\n1 3 1\n2 1 2\n2 3 5\n3 4 3';
+        document.getElementById('graph-start').value = '0';
     } else if (algo === 'bellman_ford') {
         document.getElementById('graph-edges').value = '0 1 4\n0 2 5\n1 2 -3\n2 3 2\n3 1 1';
+        document.getElementById('graph-start').value = '0';
+    } else if (algo === 'kruskal') {
+        document.getElementById('graph-edges').value = '0 1 4\n0 2 2\n1 2 1\n1 3 5\n2 3 8\n2 4 10\n3 4 2\n3 5 6\n4 5 3';
+        document.getElementById('graph-start').value = '';
     } else {
         document.getElementById('graph-edges').value = '0 1\n0 2\n1 3\n2 3\n3 4\n4 5\n2 5';
+        document.getElementById('graph-start').value = '0';
     }
-    document.getElementById('graph-start').value = '0';
+});
+
+function updateGraphEdgesLabelEnhanced(algo) {
+    const label = document.getElementById('edges-label');
+    if (algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal') {
+        label.textContent = 'Рёбра (по одному на строку: A B вес):';
+    } else {
+        label.textContent = 'Рёбра (по одному на строку: A B):';
+    }
+}
+
+updateGraphEdgesLabelEnhanced(document.getElementById('graph-algo').value);
+document.getElementById('graph-algo').addEventListener('change', (e) => {
+    updateGraphEdgesLabelEnhanced(e.target.value);
+});
+
+document.getElementById('graph-example').addEventListener('click', () => {
+    const algo = document.getElementById('graph-algo').value;
+    if (algo === 'dijkstra') {
+        document.getElementById('graph-edges').value = 'A B 4\nA C 1\nB D 1\nC B 2\nC D 5\nD E 3';
+        document.getElementById('graph-start').value = 'A';
+    } else if (algo === 'bellman_ford') {
+        document.getElementById('graph-edges').value = 'A B 4\nA C 5\nB C -3\nC D 2\nD B 1';
+        document.getElementById('graph-start').value = 'A';
+    } else if (algo === 'kruskal') {
+        document.getElementById('graph-edges').value = 'A B 4\nA C 2\nB C 1\nB D 5\nC D 8\nC E 10\nD E 2\nD F 6\nE F 3';
+        document.getElementById('graph-start').value = '';
+    } else {
+        document.getElementById('graph-edges').value = 'A B\nA C\nB D\nC D\nD E\nE F\nC F';
+        document.getElementById('graph-start').value = 'A';
+    }
 });
 
 document.getElementById('graph-run').addEventListener('click', async () => {
     const algo = document.getElementById('graph-algo').value;
-    const startNode = parseInt(document.getElementById('graph-start').value);
+    const startNode = document.getElementById('graph-start').value.trim();
     const rawEdges = document.getElementById('graph-edges').value.trim();
 
     if (!rawEdges) {
@@ -448,11 +506,21 @@ document.getElementById('graph-run').addEventListener('click', async () => {
         return;
     }
 
+    if (!startNode && algo !== 'kruskal') {
+        graphPlayer.el.status.textContent = 'Введите стартовую ноду';
+        return;
+    }
+
     const edges = [];
     for (const line of rawEdges.split('\n')) {
-        const parts = line.trim().split(/\s+/).map(Number);
-        if (parts.some(isNaN)) continue;
-        if (algo === 'dijkstra' || algo === 'bellman_ford') {
+        const parts = line.trim().split(/\s+/).filter(Boolean);
+        if (parts.length === 0) continue;
+        const [from, to] = parts;
+        if ((from && from.length > 3) || (to && to.length > 3) || startNode.length > 3) {
+            graphPlayer.el.status.textContent = 'Название ноды должно быть не длиннее 3 символов';
+            return;
+        }
+        if (algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal') {
             if (parts.length >= 3) edges.push([parts[0], parts[1], parts[2]]);
         } else if (parts.length >= 2) {
             edges.push([parts[0], parts[1]]);
@@ -467,10 +535,13 @@ document.getElementById('graph-run').addEventListener('click', async () => {
     graphPlayer.el.status.textContent = 'Загрузка...';
 
     try {
+        const reqBody = algo === 'kruskal'
+            ? { edges }
+            : { edges, start_node: startNode };
         const res = await fetch(`/api/graphs/${algo}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ edges, start_node: startNode }),
+            body: JSON.stringify(reqBody),
         });
         if (!res.ok) {
             let msg = res.statusText;
@@ -479,7 +550,12 @@ document.getElementById('graph-run').addEventListener('click', async () => {
         }
         const result = await res.json();
 
-        graphData = { nodes: result.nodes, edges: result.edges, algorithm: algo };
+        graphData = {
+            nodes: result.nodes,
+            edges: result.edges,
+            algorithm: algo,
+            nodeLabels: result.node_labels || {},
+        };
         graphPlayer.steps = result.steps;
         graphPlayer.current = 0;
         stopPlayer(graphPlayer);
@@ -487,7 +563,13 @@ document.getElementById('graph-run').addEventListener('click', async () => {
         graphPlayer.el.controls.style.display = 'flex';
         graphInfo.style.display = 'block';
 
-        renderGraph(graphSvg, result.nodes, result.edges, algo === 'dijkstra' || algo === 'bellman_ford');
+        renderGraph(
+            graphSvg,
+            result.nodes,
+            result.edges,
+            algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal',
+            graphData.nodeLabels
+        );
         renderGraphStepAt(0);
     } catch (e) {
         graphPlayer.el.status.textContent = `Ошибка: ${e.message}`;
@@ -495,7 +577,14 @@ document.getElementById('graph-run').addEventListener('click', async () => {
 });
 function renderGraphStepAt(idx) {
     const step = graphPlayer.steps[idx];
-    const info = updateGraphStep(graphSvg, graphData.nodes, graphData.edges, step, graphData.algorithm);
+    const info = updateGraphStep(
+        graphSvg,
+        graphData.nodes,
+        graphData.edges,
+        step,
+        graphData.algorithm,
+        graphData.nodeLabels
+    );
     graphInfo.innerHTML = info;
     graphPlayer.el.status.textContent = `Шаг ${idx + 1} / ${graphPlayer.steps.length}`;
 }
@@ -554,3 +643,12 @@ function wireControls(player, renderFn) {
 }
 
 wireControls(graphPlayer, renderGraphStepAt);
+
+graphPlayer.el.play.addEventListener('click', () => {
+    if (graphPlayer.steps.length === 0) return;
+    if (graphPlayer.playing) {
+        stopPlayer(graphPlayer);
+    } else {
+        startPlayer(graphPlayer, renderGraphStepAt);
+    }
+});

@@ -1,3 +1,13 @@
+import {
+    forceSimulation,
+    forceLink,
+    forceManyBody,
+    forceCenter,
+    forceCollide,
+    forceX,
+    forceY,
+} from 'https://cdn.jsdelivr.net/npm/d3-force@3/+esm';
+
 const COLORS = {
     defaultNode: '#569cd6',
     current:     '#f44747',
@@ -11,23 +21,36 @@ const COLORS = {
 };
 
 const NODE_R = 22;
+const W = 600;
+const H = 400;
 
 let positions = {};
+let currentSpacing = 5;
 
-export function renderGraph(svg, nodes, edges, weighted) {
-    positions = circularLayout(nodes, 600, 400);
-    draw(svg, nodes, edges, weighted, {}, [], null, null);
+export function setSpacing(val) {
+    currentSpacing = val;
 }
 
-export function updateGraphStep(svg, nodes, edges, step, algorithm) {
-    const weighted = algorithm === 'dijkstra' || algorithm === 'bellman_ford';
+function getNodeLabel(nodeId, nodeLabels = {}) {
+    const label = nodeLabels[String(nodeId)];
+    return label !== undefined ? label : String(nodeId);
+}
+
+export function renderGraph(svg, nodes, edges, weighted, nodeLabels = {}) {
+    positions = forceLayout(nodes, edges, W, H, currentSpacing);
+    draw(svg, nodes, edges, weighted, {}, [], null, null, nodeLabels, null);
+}
+
+export function updateGraphStep(svg, nodes, edges, step, algorithm, nodeLabels = {}) {
+    const weighted = algorithm === 'dijkstra' || algorithm === 'bellman_ford' || algorithm === 'kruskal';
     const visited = new Set(step.visited || []);
     const inQueue = new Set(step.queue || []);
     const current = step.current_node !== undefined ? step.current_node : null;
 
     let activeEdge = null;
     let relaxedEdge = null;
-    
+    let mstEdgeSet = null;
+
     if (algorithm === 'bellman_ford') {
         activeEdge = [step.edge_from, step.edge_to];
         if (step.relaxed) {
@@ -35,9 +58,33 @@ export function updateGraphStep(svg, nodes, edges, step, algorithm) {
         }
     }
 
+    if (algorithm === 'kruskal') {
+        activeEdge = [step.edge_from, step.edge_to];
+        if (step.accepted) {
+            relaxedEdge = [step.edge_from, step.edge_to];
+        }
+        // Собираем множество MST-рёбер для подсветки
+        mstEdgeSet = new Set();
+        for (const e of (step.mst_edges || [])) {
+            mstEdgeSet.add(`${e[0]}-${e[1]}`);
+            mstEdgeSet.add(`${e[1]}-${e[0]}`);
+        }
+    }
+
     const nodeColors = {};
     for (const n of nodes) {
-        if (algorithm === 'bellman_ford') {
+        if (algorithm === 'kruskal') {
+            if (n === step.edge_from || n === step.edge_to) {
+                nodeColors[n] = step.accepted ? COLORS.visited : COLORS.current;
+            } else {
+                // Подсвечиваем вершины, входящие в MST
+                let inMst = false;
+                for (const e of (step.mst_edges || [])) {
+                    if (e[0] === n || e[1] === n) { inMst = true; break; }
+                }
+                nodeColors[n] = inMst ? COLORS.visited : COLORS.defaultNode;
+            }
+        } else if (algorithm === 'bellman_ford') {
             if (n === step.edge_from) nodeColors[n] = COLORS.current;
             else if (visited.has(n)) nodeColors[n] = COLORS.visited;
             else nodeColors[n] = COLORS.defaultNode;
@@ -48,27 +95,74 @@ export function updateGraphStep(svg, nodes, edges, step, algorithm) {
             else nodeColors[n] = COLORS.defaultNode;
         }
     }
-    draw(svg, nodes, edges, weighted, nodeColors, step.distances || {}, activeEdge, relaxedEdge);
-    return formatInfo(step, algorithm);
+
+    draw(
+        svg,
+        nodes,
+        edges,
+        weighted,
+        nodeColors,
+        step.distances || {},
+        activeEdge,
+        relaxedEdge,
+        nodeLabels,
+        mstEdgeSet
+    );
+    return formatInfo(step, algorithm, nodeLabels);
 }
 
-function circularLayout(nodes, w, h) {
-    const cx = w / 2, cy = h / 2;
-    const r = Math.min(w, h) / 2 - 50;
-    const pos = {};
-    nodes.forEach((node, i) => {
-        const angle = (2 * Math.PI * i) / nodes.length - Math.PI / 2;
-        pos[node] = { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+function forceLayout(nodes, edges, w, h, spacing) {
+    const s = (spacing || 5) / 5;
+    const pad = NODE_R + 20;
+
+    const simNodes = nodes.map((id) => ({ id }));
+    const nodeIndex = {};
+    simNodes.forEach((n, i) => {
+        nodeIndex[n.id] = i;
     });
+
+    const simLinks = [];
+    for (const e of edges) {
+        const src = nodeIndex[e[0]];
+        const tgt = nodeIndex[e[1]];
+        if (src !== undefined && tgt !== undefined) {
+            simLinks.push({ source: src, target: tgt });
+        }
+    }
+
+    const baseDist = Math.max(60, Math.min(140, 600 / nodes.length));
+    const linkDist = baseDist * s;
+    const charge = -250 * s;
+    const collide = (NODE_R + 8) * s;
+
+    const sim = forceSimulation(simNodes)
+        .force('charge', forceManyBody().strength(charge))
+        .force('link', forceLink(simLinks).distance(linkDist).strength(1))
+        .force('center', forceCenter(w / 2, h / 2))
+        .force('collide', forceCollide(collide))
+        .force('x', forceX(w / 2).strength(0.05))
+        .force('y', forceY(h / 2).strength(0.05))
+        .stop();
+
+    for (let i = 0; i < 300; i++) sim.tick();
+
+    const pos = {};
+    for (const n of simNodes) {
+        pos[n.id] = {
+            x: Math.max(pad, Math.min(w - pad, n.x)),
+            y: Math.max(pad, Math.min(h - pad, n.y)),
+        };
+    }
     return pos;
 }
 
-function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, relaxedEdge) {
+function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, relaxedEdge, nodeLabels = {}, mstEdgeSet = null) {
     let html = '';
 
     for (const edge of edges) {
         const [u, v] = edge;
-        const p1 = positions[u], p2 = positions[v];
+        const p1 = positions[u];
+        const p2 = positions[v];
         if (!p1 || !p2) continue;
 
         let color = COLORS.defaultEdge;
@@ -80,6 +174,9 @@ function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, re
         } else if (activeEdge && activeEdge[0] === u && activeEdge[1] === v) {
             color = COLORS.activeEdge;
             strokeWidth = 4;
+        } else if (mstEdgeSet && (mstEdgeSet.has(`${u}-${v}`) || mstEdgeSet.has(`${v}-${u}`))) {
+            color = COLORS.relaxedEdge;
+            strokeWidth = 3.5;
         }
 
         html += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}"
@@ -104,7 +201,7 @@ function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, re
                          fill="${fill}" stroke="#1e1e1e" stroke-width="2.5"/>`;
         html += `<text x="${p.x}" y="${p.y + 5}" text-anchor="middle"
                        fill="${COLORS.nodeText}" font-size="15" font-weight="bold"
-                       font-family="'JetBrains Mono', monospace">${n}</text>`;
+                       font-family="'JetBrains Mono', monospace">${getNodeLabel(n, nodeLabels)}</text>`;
 
         if (distances && distances[String(n)] !== undefined) {
             const d = distances[String(n)];
@@ -118,22 +215,38 @@ function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, re
     svg.innerHTML = html;
 }
 
-function formatInfo(step, algorithm) {
+function formatInfo(step, algorithm, nodeLabels = {}) {
     const lines = [];
-    
-    if (algorithm === 'bellman_ford') {
+
+    if (algorithm === 'kruskal') {
+        lines.push(
+            `<span class="label">Ребро:</span> <span class="value">${getNodeLabel(step.edge_from, nodeLabels)} — ${getNodeLabel(step.edge_to, nodeLabels)} (вес: ${step.edge_weight})</span>`
+        );
+        lines.push(`<span class="label">Принято в MST:</span> <span class="value">${step.accepted ? 'Да' : 'Нет (цикл)'}</span>`);
+        const mstLabels = (step.mst_edges || [])
+            .map(e => `${getNodeLabel(e[0], nodeLabels)}—${getNodeLabel(e[1], nodeLabels)}`)
+            .join(', ');
+        lines.push(`<span class="label">Рёбра MST:</span> <span class="value">[${mstLabels}]</span>`);
+        lines.push(`<span class="label">Вес MST:</span> <span class="value">${step.total_weight}</span>`);
+    } else if (algorithm === 'bellman_ford') {
         lines.push(`<span class="label">Итерация:</span> <span class="value">${step.iteration}</span>`);
-        lines.push(`<span class="label">Ребро:</span> <span class="value">${step.edge_from} → ${step.edge_to}</span>`);
-        lines.push(`<span class="label">Релаксация:</span> <span class="value">${step.relaxed ? '✓ Да' : '✗ Нет'}</span>`);
+        lines.push(
+            `<span class="label">Ребро:</span> <span class="value">${getNodeLabel(step.edge_from, nodeLabels)} → ${getNodeLabel(step.edge_to, nodeLabels)}</span>`
+        );
+        lines.push(`<span class="label">Релаксация:</span> <span class="value">${step.relaxed ? 'Да' : 'Нет'}</span>`);
     } else {
-        lines.push(`<span class="label">Вершина:</span> <span class="value">${step.current_node}</span>`);
-        lines.push(`<span class="label">Посещены:</span> <span class="value">[${(step.visited || []).join(', ')}]</span>`);
-        lines.push(`<span class="label">Очередь:</span> <span class="value">[${(step.queue || []).join(', ')}]</span>`);
+        lines.push(`<span class="label">Вершина:</span> <span class="value">${getNodeLabel(step.current_node, nodeLabels)}</span>`);
+        lines.push(
+            `<span class="label">Посещены:</span> <span class="value">[${(step.visited || []).map((node) => getNodeLabel(node, nodeLabels)).join(', ')}]</span>`
+        );
+        lines.push(
+            `<span class="label">Очередь:</span> <span class="value">[${(step.queue || []).map((node) => getNodeLabel(node, nodeLabels)).join(', ')}]</span>`
+        );
     }
 
     if ((algorithm === 'dijkstra' || algorithm === 'bellman_ford') && step.distances) {
         const dists = Object.entries(step.distances)
-            .map(([k, v]) => `${k}:${v === null ? '∞' : v}`)
+            .map(([k, v]) => `${getNodeLabel(k, nodeLabels)}:${v === null ? '∞' : v}`)
             .join(', ');
         lines.push(`<span class="label">Расстояния:</span> <span class="value">{${dists}}</span>`);
     }

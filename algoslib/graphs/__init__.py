@@ -13,4 +13,10 @@ except ImportError:
     Ford_Step = None
     bellman_ford = None
 
-__all__ = ['bfs', 'Graph', 'BFS_Step', 'Weighted_Graph', 'Dijkstra_Step', 'dijkstra','Ford_Step', 'bellman_ford']
+try:
+    from .sub_graphs import Kruskal_Step, kruskal
+except ImportError:
+    Kruskal_Step = None
+    kruskal = None
+
+__all__ = ['bfs', 'Graph', 'BFS_Step', 'Weighted_Graph', 'Dijkstra_Step', 'dijkstra','Ford_Step', 'bellman_ford', 'Kruskal_Step', 'kruskal']

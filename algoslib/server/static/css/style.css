@@ -127,6 +127,17 @@ body {
     align-items: start;
 }
 
+.input-row.vertical {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.graph-main-row .input-panel select,
+.graph-main-row .input-panel input[type="text"] {
+    width: 100%;
+    min-width: 0;
+}
+
 input[type="text"],
 input[type="number"],
 textarea,
@@ -381,12 +392,35 @@ select {
     flex-wrap: wrap;
 }
 
-.speed-control {
+.speed-control,
+.graph-spacing-control {
     display: flex;
     align-items: center;
     gap: 10px;
     font-size: 0.95em;
     color: var(--text-muted);
+}
+
+.graph-spacing-control {
+    justify-content: center;
+    margin-top: 12px;
+}
+
+.graph-main-row {
+    display: flex;
+    gap: 15px;
+    align-items: flex-start;
+}
+
+.graph-main-row .input-panel {
+    flex: 0 0 auto;
+    width: 400px;
+    margin-bottom: 0;
+}
+
+.graph-right {
+    flex: 1;
+    min-width: 0;
 }
 
 input[type="range"] {
