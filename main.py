@@ -1,4 +1,4 @@
-from algoslib.sorting.sub_sorting import bogo_sort_h
+from algoslib.sorting.sub_sorting import counting_sort
 
-arr = [3,1,5,7,3]
-print(bogo_sort_h(arr))
+arr = [1]
+print(counting_sort(arr))

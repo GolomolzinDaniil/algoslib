@@ -6,6 +6,7 @@
 #include "bogo_sort.hpp"
 #include "insertion_sort.hpp"
 #include "quick_sort.hpp"
+#include "counting_sort.hpp"
 
 
 PYBIND11_MODULE(sub_sorting, m) {
@@ -66,7 +67,17 @@ PYBIND11_MODULE(sub_sorting, m) {
         },
         py::arg("data")
     );
+    m.def(
+        "counting_sort_h",
+        [](const py::list& data) {
+            return get_history([](auto vec) {
+                return counting_sort_h(vec);
+            }, data);
+        },
+        py::arg("data")
+    );
     
+
     m.def(
         "bubble_sort",
         [](const py::list& data) {
@@ -117,6 +128,15 @@ PYBIND11_MODULE(sub_sorting, m) {
         [](const py::list& data) {
             return get_sorted([](auto vec) {
                 return quick_sort(vec);
+            }, data);
+        },
+        py::arg("data")
+    );
+    m.def(
+        "counting_sort",
+        [](const py::list& data) {
+            return get_sorted([](auto vec) {
+                return counting_sort(vec);
             }, data);
         },
         py::arg("data")
