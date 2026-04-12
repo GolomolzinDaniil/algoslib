@@ -11,6 +11,7 @@
 #include "bogo_sort.hpp"
 #include "insertion_sort.hpp"
 #include "quick_sort.hpp"
+#include "counting_sort.hpp"
 
 
 namespace py = pybind11;
@@ -96,7 +97,8 @@ inline py::list to_py(const std::vector<Insertion_step<std::int64_t>>& history)
     return res;
 };
 
-inline py::list to_py(const std::vector<Insertion_step<double>>& history)
+template <typename T>
+inline py::list to_py(const std::vector<Insertion_step<T>>& history)
 {
     py::list res;
     for (const auto& step : history)
@@ -124,6 +126,24 @@ inline py::list to_py(const std::vector<Quick_step>& history)
                 py::arg("high") = step.high,
                 py::arg("curr_ind") = step.curr_ind,
                 py::arg("is_swap") = step.is_swap
+            )
+        );
+    }
+    return res;
+};
+
+template <typename T>
+inline py::list to_py(const std::vector<Counting_step<T>>& history)
+{
+    py::list res;
+    for (const auto& step : history)
+    {
+        py::dict mapping;
+        for (const auto& [key, value] : step.nums_elems) mapping[py::cast(key)] = value;
+
+        res.append(
+            py::dict(
+                py::arg("nums_elems") = mapping
             )
         );
     }
