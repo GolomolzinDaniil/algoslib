@@ -415,3 +415,53 @@ def test_kruskal_components():
     # После последнего шага все вершины должны быть в одной компоненте
     final_components = steps[-1].components
     assert len(set(final_components.values())) == 1
+
+
+def test_ford_fulkerson_simple():
+    """Простой граф: s -> a -> t с пропускной способностью 10"""
+    g = Flow_Graph()
+    g.add_edge(0, 1, 10.0)
+    g.add_edge(1, 2, 10.0)
+    
+    result = ford_fulkerson(g, 0, 2)
+    
+    assert result.max_flow == 10.0
+    assert len(result.history) >= 1
+
+
+def test_ford_fulkerson_multiple_paths():
+    """Граф с несколькими путями"""
+    g = Flow_Graph()
+    g.add_edge(0, 1, 10.0)
+    g.add_edge(0, 2, 10.0)
+    g.add_edge(1, 3, 10.0)
+    g.add_edge(2, 3, 10.0)
+    
+    result = ford_fulkerson(g, 0, 3)
+    
+    assert result.max_flow == 20.0
+
+
+def test_ford_fulkerson_bottleneck():
+    """Граф с узким местом"""
+    g = Flow_Graph()
+    g.add_edge(0, 1, 10.0)
+    g.add_edge(1, 2, 5.0)  
+    g.add_edge(2, 3, 10.0)
+    
+    result = ford_fulkerson(g, 0, 3)
+    
+    assert result.max_flow == 5.0
+
+
+def test_ford_fulkerson_step_type():
+    """Проверка типа шагов"""
+    g = Flow_Graph()
+    g.add_edge(0, 1, 10.0)
+    g.add_edge(1, 2, 10.0)
+    
+    result = ford_fulkerson(g, 0, 2)
+    
+    assert all(isinstance(s, FordFulkerson_Step) for s in result.history)
+
+
