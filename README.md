@@ -121,13 +121,18 @@ async def run_my_algo(req: BFSRequest):
 ### Для Linux
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 ```
 #### Для очистки (может решить проблему при комплиции)
 ```bash
 rm -rf build/ dist/ *.egg-info
 find . -name "*.so" -delete
 find . -name "*.o" -delete
+
+python setup.py build_ext --inplace
+pytest tests/
+
+python -m algoslib.server
 ```
 
 
