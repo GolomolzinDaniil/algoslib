@@ -102,6 +102,7 @@
                         <option value="dijkstra">Dijkstra</option>
                         <option value="bellman_ford">Bellman-Ford</option>
                         <option value="kruskal">Kruskal (MST)</option>
+                        <option value="ford_fulkerson">Ford-Fulkerson (Макс. поток)</option>
                     </select>
                 </div>
                 <div class="input-row vertical">
@@ -115,6 +116,10 @@ D E</textarea>
                 <div class="input-row">
                     <label>Начальная вершина:</label>
                     <input type="text" id="graph-start" value="A" placeholder="A" maxlength="3">
+                </div>
+                <div id="sink-field" style="display: none;">
+                    <label for="graph-sink">Сток (sink):</label>
+                    <input type="text" id="graph-sink" value="F" placeholder="F" maxlength="3">
                 </div>
                 <div class="input-row">
                     <button class="btn primary" id="graph-run">
