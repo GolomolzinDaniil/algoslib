@@ -54,3 +54,19 @@ struct Ford_Step {
     double new_distance;  // Новое расстояние до edge_to после релаксации (или -1 если не менялось)
     std::unordered_map<int, double> distances;
 };
+
+struct Flow_Graph {
+    std::unordered_map<int, std::vector<std::pair<int, double>>> adjacency_list;
+
+    void add_edge(int u, int v, double capacity) {
+        adjacency_list[u].emplace_back(v, capacity);
+
+        if (!adjacency_list.count(v)) {
+            adjacency_list[v] = {};
+        }
+    }
+
+    const std::vector<std::pair<int, double>>& get_neighbors(int u) const {
+        return adjacency_list.at(u);
+    }
+};

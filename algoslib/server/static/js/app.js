@@ -1,5 +1,5 @@
 import { renderSortingCells, updateSortingStep } from './sorting-viz.js';
-import { renderGraph, updateGraphStep, setSpacing } from './graph-viz.js';
+import { renderGraph, updateGraphStep, setSpacing, renderFlowGraph, updateFlowGraphStep } from './graph-viz.js';
 
 const SORTING_META = {
     bubble: {
@@ -120,6 +120,7 @@ function createPlayer(prefix) {
         playing: false,
         timer: null,
         speed: parseInt(document.getElementById(`${prefix}-speed`).value),
+        renderFn: null,
         el: {
             prev: document.getElementById(`${prefix}-prev`),
             play: document.getElementById(`${prefix}-play`),
@@ -135,7 +136,7 @@ function createPlayer(prefix) {
 const sortPlayer = createPlayer('sort');
 const graphPlayer = createPlayer('graph');
 
-let graphData = { nodes: [], edges: [], algorithm: 'bfs', nodeLabels: {} };
+let graphData = { nodes: [], edges: [], algorithm: 'bfs', nodeLabels: {}, source: null, sink: null };
 let sortData = { history: [], initialArray: [], sortedArray: [] };
 let uploadedSortData = null;
 const sortPlot = document.getElementById('sort-plot');
@@ -423,19 +424,34 @@ spacingSlider.addEventListener('input', () => {
     setSpacing(Number(spacingSlider.value));
     if (graphData) {
         const algo = graphData.algorithm;
-        const weighted = algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal';
-        renderGraph(graphSvg, graphData.nodes, graphData.edges, weighted, graphData.nodeLabels);
-        if (graphPlayer.steps.length) renderGraphStepAt(graphPlayer.current);
+        if (algo === 'ford_fulkerson') {
+            renderFlowGraph(graphSvg, graphData.nodes, graphData.edges, graphData.source, graphData.sink);
+            if (graphPlayer.steps.length) renderFlowStepAt(graphPlayer.current);
+        } else {
+            const weighted = algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal';
+            renderGraph(graphSvg, graphData.nodes, graphData.edges, weighted, graphData.nodeLabels);
+            if (graphPlayer.steps.length) renderGraphStepAt(graphPlayer.current);
+        }
     }
 });
 
 document.getElementById('graph-algo').addEventListener('change', (e) => {
     const label = document.getElementById('edges-label');
+    const sourceLabel = document.getElementById('source-label');
+    const sinkField = document.getElementById('sink-field');
     const algo = e.target.value;
     if (algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal') {
-        label.textContent = 'Рёбра (по одному на строке: u v вес):';
+        label.textContent = 'Рёбра (по одному на строке: A B вес):';
+        if (sourceLabel) sourceLabel.textContent = 'Стартовая вершина:';
+        if (sinkField) sinkField.style.display = 'none';
+    } else if (algo === 'ford_fulkerson') {
+        label.textContent = 'Рёбра (A B пропускная_способность):';
+        if (sourceLabel) sourceLabel.textContent = 'Источник (source):';
+        if (sinkField) sinkField.style.display = 'block';
     } else {
-        label.textContent = 'Рёбра (по одному на строке: u v):';
+        label.textContent = 'Рёбра (по одному на строке: A B):';
+        if (sourceLabel) sourceLabel.textContent = 'Начальная вершина:';
+        if (sinkField) sinkField.style.display = 'none';
     }
 
     const startInput = document.getElementById('graph-start');
@@ -451,42 +467,16 @@ document.getElementById('graph-algo').addEventListener('change', (e) => {
 document.getElementById('graph-example').addEventListener('click', () => {
     const algo = document.getElementById('graph-algo').value;
     if (algo === 'dijkstra') {
-        document.getElementById('graph-edges').value = '0 1 4\n0 2 1\n1 3 1\n2 1 2\n2 3 5\n3 4 3';
-        document.getElementById('graph-start').value = '0';
-    } else if (algo === 'bellman_ford') {
-        document.getElementById('graph-edges').value = '0 1 4\n0 2 5\n1 2 -3\n2 3 2\n3 1 1';
-        document.getElementById('graph-start').value = '0';
-    } else if (algo === 'kruskal') {
-        document.getElementById('graph-edges').value = '0 1 4\n0 2 2\n1 2 1\n1 3 5\n2 3 8\n2 4 10\n3 4 2\n3 5 6\n4 5 3';
-        document.getElementById('graph-start').value = '';
-    } else {
-        document.getElementById('graph-edges').value = '0 1\n0 2\n1 3\n2 3\n3 4\n4 5\n2 5';
-        document.getElementById('graph-start').value = '0';
-    }
-});
-
-function updateGraphEdgesLabelEnhanced(algo) {
-    const label = document.getElementById('edges-label');
-    if (algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal') {
-        label.textContent = 'Рёбра (по одному на строку: A B вес):';
-    } else {
-        label.textContent = 'Рёбра (по одному на строку: A B):';
-    }
-}
-
-updateGraphEdgesLabelEnhanced(document.getElementById('graph-algo').value);
-document.getElementById('graph-algo').addEventListener('change', (e) => {
-    updateGraphEdgesLabelEnhanced(e.target.value);
-});
-
-document.getElementById('graph-example').addEventListener('click', () => {
-    const algo = document.getElementById('graph-algo').value;
-    if (algo === 'dijkstra') {
         document.getElementById('graph-edges').value = 'A B 4\nA C 1\nB D 1\nC B 2\nC D 5\nD E 3';
         document.getElementById('graph-start').value = 'A';
     } else if (algo === 'bellman_ford') {
         document.getElementById('graph-edges').value = 'A B 4\nA C 5\nB C -3\nC D 2\nD B 1';
         document.getElementById('graph-start').value = 'A';
+    } else if (algo === 'ford_fulkerson') {
+        document.getElementById('graph-edges').value = 'A B 10\nA C 10\nB C 2\nB D 4\nC E 9\nD C 4\nD F 10\nE D 6\nE F 10';
+        document.getElementById('graph-start').value = 'A';
+        const sinkInput = document.getElementById('graph-sink');
+        if (sinkInput) sinkInput.value = 'F';
     } else if (algo === 'kruskal') {
         document.getElementById('graph-edges').value = 'A B 4\nA C 2\nB C 1\nB D 5\nC D 8\nC E 10\nD E 2\nD F 6\nE F 3';
         document.getElementById('graph-start').value = '';
@@ -494,6 +484,22 @@ document.getElementById('graph-example').addEventListener('click', () => {
         document.getElementById('graph-edges').value = 'A B\nA C\nB D\nC D\nD E\nE F\nC F';
         document.getElementById('graph-start').value = 'A';
     }
+});
+
+function updateGraphEdgesLabelEnhanced(algo) {
+    const label = document.getElementById('edges-label');
+    if (algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal') {
+        label.textContent = 'Рёбра (по одному на строке: A B вес):';
+    } else if (algo === 'ford_fulkerson') {
+        label.textContent = 'Рёбра (A B пропускная_способность):';
+    } else {
+        label.textContent = 'Рёбра (по одному на строке: A B):';
+    }
+}
+
+updateGraphEdgesLabelEnhanced(document.getElementById('graph-algo').value);
+document.getElementById('graph-algo').addEventListener('change', (e) => {
+    updateGraphEdgesLabelEnhanced(e.target.value);
 });
 
 document.getElementById('graph-run').addEventListener('click', async () => {
@@ -506,8 +512,17 @@ document.getElementById('graph-run').addEventListener('click', async () => {
         return;
     }
 
-    if (!startNode && algo !== 'kruskal') {
+    if (!startNode && algo !== 'kruskal' && algo !== 'ford_fulkerson') {
         graphPlayer.el.status.textContent = 'Введите стартовую ноду';
+        return;
+    }
+
+    const sinkNode = algo === 'ford_fulkerson' 
+        ? document.getElementById('graph-sink')?.value.trim() 
+        : null;
+
+    if (algo === 'ford_fulkerson' && !sinkNode) {
+        graphPlayer.el.status.textContent = 'Введите сток (sink)';
         return;
     }
 
@@ -516,11 +531,11 @@ document.getElementById('graph-run').addEventListener('click', async () => {
         const parts = line.trim().split(/\s+/).filter(Boolean);
         if (parts.length === 0) continue;
         const [from, to] = parts;
-        if ((from && from.length > 3) || (to && to.length > 3) || startNode.length > 3) {
+        if ((from && from.length > 3) || (to && to.length > 3) || (startNode && startNode.length > 3)) {
             graphPlayer.el.status.textContent = 'Название ноды должно быть не длиннее 3 символов';
             return;
         }
-        if (algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal') {
+        if (algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal' || algo === 'ford_fulkerson') {
             if (parts.length >= 3) edges.push([parts[0], parts[1], parts[2]]);
         } else if (parts.length >= 2) {
             edges.push([parts[0], parts[1]]);
@@ -537,7 +552,10 @@ document.getElementById('graph-run').addEventListener('click', async () => {
     try {
         const reqBody = algo === 'kruskal'
             ? { edges }
-            : { edges, start_node: startNode };
+            : algo === 'ford_fulkerson'
+                ? { edges, start_node: startNode, sink: sinkNode }
+                : { edges, start_node: startNode };
+                
         const res = await fetch(`/api/graphs/${algo}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -555,6 +573,8 @@ document.getElementById('graph-run').addEventListener('click', async () => {
             edges: result.edges,
             algorithm: algo,
             nodeLabels: result.node_labels || {},
+            source: result.source,
+            sink: result.sink,  
         };
         graphPlayer.steps = result.steps;
         graphPlayer.current = 0;
@@ -562,17 +582,19 @@ document.getElementById('graph-run').addEventListener('click', async () => {
 
         graphPlayer.el.controls.style.display = 'flex';
         graphInfo.style.display = 'block';
-
-        renderGraph(
-            graphSvg,
-            result.nodes,
-            result.edges,
-            algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal',
-            graphData.nodeLabels
-        );
-        renderGraphStepAt(0);
+        if (algo === 'ford_fulkerson') {
+            graphPlayer.renderFn = renderFlowStepAt;
+            renderFlowGraph(graphSvg, graphData.nodes, graphData.edges, graphData.source, graphData.sink, graphData.nodeLabels);
+            renderFlowStepAt(0);
+        } else {
+            graphPlayer.renderFn = renderGraphStepAt;
+            const weighted = algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal';
+            renderGraph(graphSvg, graphData.nodes, graphData.edges, weighted, graphData.nodeLabels);
+            renderGraphStepAt(0);
+        }
     } catch (e) {
         graphPlayer.el.status.textContent = `Ошибка: ${e.message}`;
+        console.error('Graph run error:', e);
     }
 });
 function renderGraphStepAt(idx) {
@@ -587,6 +609,20 @@ function renderGraphStepAt(idx) {
     );
     graphInfo.innerHTML = info;
     graphPlayer.el.status.textContent = `Шаг ${idx + 1} / ${graphPlayer.steps.length}`;
+}
+function renderFlowStepAt(idx) {
+    const step = graphPlayer.steps[idx];
+    const info = updateFlowGraphStep(
+        graphSvg,
+        graphData.nodes,
+        graphData.edges,
+        step,
+        graphData.source,
+        graphData.sink,
+        graphData.nodeLabels
+    );
+    graphInfo.innerHTML = info;
+    graphPlayer.el.status.textContent = `Итерация ${step.iteration} / ${graphPlayer.steps.length}`;
 }
 
 function refreshIcons() {
@@ -614,27 +650,32 @@ function startPlayer(player, renderFn) {
             return;
         }
         player.current++;
-        renderFn(player.current);
+        (player.renderFn || renderFn)(player.current);
         player.timer = setTimeout(loop, player.speed);
     }
     loop();
 }
 
 function wireControls(player, renderFn) {
+    player.renderFn = renderFn;
     player.el.prev.addEventListener('click', () => {
         if (player.current > 0) {
             stopPlayer(player);
             player.current--;
-            renderFn(player.current);
+            player.renderFn(player.current);
         }
     });
     player.el.next.addEventListener('click', () => {
         if (player.current < player.steps.length - 1) {
             player.current++;
-            renderFn(player.current);
+            player.renderFn(player.current);
         } else {
             stopPlayer(player);
         }
+    });
+    player.el.play.addEventListener('click', () => {
+        if (player.playing) stopPlayer(player);
+        else startPlayer(player, player.renderFn);
     });
     player.el.speed.addEventListener('input', (e) => {
         player.speed = parseInt(e.target.value);
@@ -649,6 +690,6 @@ graphPlayer.el.play.addEventListener('click', () => {
     if (graphPlayer.playing) {
         stopPlayer(graphPlayer);
     } else {
-        startPlayer(graphPlayer, renderGraphStepAt);
+        startPlayer(graphPlayer, graphPlayer.renderFn || renderGraphStepAt);
     }
 });

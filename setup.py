@@ -38,7 +38,8 @@ extensions = [
             'lib/graphs/src/bfs.cpp',
             'lib/graphs/src/dijkstra.cpp',
             'lib/graphs/src/bellman_ford.cpp',
-            'lib/graphs/src/kruskal.cpp'
+            'lib/graphs/src/kruskal.cpp',
+            'lib/graphs/src/ford_fulkerson.cpp',
         ],
         include_dirs=[
             pybind11.get_include(),

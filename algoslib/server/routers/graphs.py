@@ -26,6 +26,11 @@ class BellmanFordRequest(BaseModel):
 class KruskalRequest(BaseModel):
     edges: list[list[str]]
 
+class FordFulkersonRequest(BaseModel):
+    edges: list[list[str]]
+    start_node: str
+    sink: str
+
 
 def _normalize_label(value: str) -> str:
     label = str(value).strip()
@@ -286,3 +291,79 @@ async def run_kruskal(req: KruskalRequest):
     except Exception as e:
         traceback.print_exc()
         return JSONResponse(status_code=500, content={"detail": str(e)})
+    
+@router.post("/ford_fulkerson")
+async def run_ford_fulkerson(req: FordFulkersonRequest):
+    try:
+        from algoslib.graphs import Flow_Graph, ford_fulkerson
+        if ford_fulkerson is None:
+            raise HTTPException(status_code=501, detail="Ford-Fulkerson не доступен")
+        
+        label_to_id, node_labels = _build_label_maps_no_start(req.edges)
+        parsed_edges = _parse_weighted_edges(req.edges, label_to_id)
+
+        graph = Flow_Graph()
+        nodes = set()
+        for u, v, cap in parsed_edges:
+            graph.add_edge(u, v, cap)
+            nodes.add(u)
+            nodes.add(v)
+
+        source_id = label_to_id.get(req.start_node)
+        sink_id = label_to_id.get(req.sink)
+        
+        if source_id is None:
+            raise HTTPException(status_code=400, detail=f"Источник '{req.start_node}' не найден в графе")
+        if sink_id is None:
+            raise HTTPException(status_code=400, detail=f"Сток '{req.sink}' не найден в графе")
+
+        result = ford_fulkerson(graph, source_id, sink_id)
+
+        result_steps = []
+        for step in result.history:
+            augmenting_path = [node_labels.get(x, str(x)) for x in step.augmenting_path]
+            residual = {}
+            for u, targets in step.residual_capacities.items():
+                u_label = node_labels.get(u, str(u))
+                residual[u_label] = {
+                    node_labels.get(v, str(v)): float(cap) 
+                    for v, cap in targets.items()
+                }
+            
+            result_steps.append({
+                "iteration": int(step.iteration),
+                "augmenting_path": augmenting_path,
+                "flow_increase": float(step.flow_increase),
+                "total_flow": float(step.total_flow),
+                "residual_capacities": residual,
+            })
+
+        flow_dict = {}
+        for u, targets in result.flow.items():
+            u_label = node_labels.get(u, str(u))
+            flow_dict[u_label] = {
+                node_labels.get(v, str(v)): float(cap) 
+                for v, cap in targets.items() 
+                if abs(cap) > 1e-9
+            }
+
+        return {
+            "steps": result_steps,
+            "max_flow": float(result.max_flow),
+            "flow": flow_dict,
+            "edges": parsed_edges, 
+            "nodes": sorted(nodes), 
+            "node_labels": node_labels, 
+            "source": source_id,
+            "sink": sink_id, 
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"detail": str(e), "error_type": type(e).__name__}
+        )
