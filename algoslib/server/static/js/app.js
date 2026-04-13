@@ -424,7 +424,7 @@ spacingSlider.addEventListener('input', () => {
     setSpacing(Number(spacingSlider.value));
     if (graphData) {
         const algo = graphData.algorithm;
-        if (algo === 'ford_fulkerson') {
+        if (algo === 'ford_fulkerson' || algo === 'edmonds_karp') {
             renderFlowGraph(graphSvg, graphData.nodes, graphData.edges, graphData.source, graphData.sink);
             if (graphPlayer.steps.length) renderFlowStepAt(graphPlayer.current);
         } else {
@@ -444,7 +444,7 @@ document.getElementById('graph-algo').addEventListener('change', (e) => {
         label.textContent = 'Рёбра (по одному на строке: A B вес):';
         if (sourceLabel) sourceLabel.textContent = 'Стартовая вершина:';
         if (sinkField) sinkField.style.display = 'none';
-    } else if (algo === 'ford_fulkerson') {
+    } else if (algo === 'ford_fulkerson' || algo === 'edmonds_karp') {
         label.textContent = 'Рёбра (A B пропускная_способность):';
         if (sourceLabel) sourceLabel.textContent = 'Источник (source):';
         if (sinkField) sinkField.style.display = 'block';
@@ -472,7 +472,7 @@ document.getElementById('graph-example').addEventListener('click', () => {
     } else if (algo === 'bellman_ford') {
         document.getElementById('graph-edges').value = 'A B 4\nA C 5\nB C -3\nC D 2\nD B 1';
         document.getElementById('graph-start').value = 'A';
-    } else if (algo === 'ford_fulkerson') {
+    } else if (algo === 'ford_fulkerson' || algo === 'edmonds_karp') {
         document.getElementById('graph-edges').value = 'A B 10\nA C 10\nB C 2\nB D 4\nC E 9\nD C 4\nD F 10\nE D 6\nE F 10';
         document.getElementById('graph-start').value = 'A';
         const sinkInput = document.getElementById('graph-sink');
@@ -517,13 +517,15 @@ document.getElementById('graph-run').addEventListener('click', async () => {
         return;
     }
 
-    const sinkNode = algo === 'ford_fulkerson' 
+    const sinkNode = algo === 'ford_fulkerson' || algo === 'edmonds_karp' 
         ? document.getElementById('graph-sink')?.value.trim() 
         : null;
 
-    if (algo === 'ford_fulkerson' && !sinkNode) {
-        graphPlayer.el.status.textContent = 'Введите сток (sink)';
-        return;
+    if (algo === 'ford_fulkerson' || algo === 'edmonds_karp') {
+        if (!sinkNode) {
+            graphPlayer.el.status.textContent = 'Введите сток (sink)';
+            return;
+        }
     }
 
     const edges = [];
@@ -535,7 +537,8 @@ document.getElementById('graph-run').addEventListener('click', async () => {
             graphPlayer.el.status.textContent = 'Название ноды должно быть не длиннее 3 символов';
             return;
         }
-        if (algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal' || algo === 'ford_fulkerson') {
+        if (algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal' || 
+            algo === 'ford_fulkerson' || algo === 'edmonds_karp') {
             if (parts.length >= 3) edges.push([parts[0], parts[1], parts[2]]);
         } else if (parts.length >= 2) {
             edges.push([parts[0], parts[1]]);
@@ -552,7 +555,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
     try {
         const reqBody = algo === 'kruskal'
             ? { edges }
-            : algo === 'ford_fulkerson'
+            : algo === 'ford_fulkerson' || algo === 'edmonds_karp'
                 ? { edges, start_node: startNode, sink: sinkNode }
                 : { edges, start_node: startNode };
                 
@@ -582,7 +585,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
 
         graphPlayer.el.controls.style.display = 'flex';
         graphInfo.style.display = 'block';
-        if (algo === 'ford_fulkerson') {
+        if (algo === 'ford_fulkerson' || algo === 'edmonds_karp') {
             graphPlayer.renderFn = renderFlowStepAt;
             renderFlowGraph(graphSvg, graphData.nodes, graphData.edges, graphData.source, graphData.sink, graphData.nodeLabels);
             renderFlowStepAt(0);
