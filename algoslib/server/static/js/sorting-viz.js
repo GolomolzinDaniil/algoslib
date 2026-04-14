@@ -59,6 +59,11 @@ function isInsertionStep(step) {
         && Object.prototype.hasOwnProperty.call(step ?? {}, 'value');
 }
 
+function isCountingStep(step) {
+    return Object.prototype.hasOwnProperty.call(step ?? {}, 'phase')
+        && Array.isArray(step?.buckets);
+}
+
 function getBogoStepColor(step, stepIndex) {
     if (stepIndex === 0) return 'blue';
     return step?.is_sorted ? 'green' : 'red';
@@ -391,6 +396,160 @@ function updateInsertionStep(container, history, initialArray, stepIndex, speed,
     return formatStatus(visibleValues, step, stepIndex, history.length, values.length);
 }
 
+function getDefaultCountingBuckets(initialArray) {
+    const keys = [...new Set(initialArray)].sort((a, b) => a - b);
+    return keys.map((value) => ({ value, count: 0 }));
+}
+
+function createCountingPreviewStep(initialArray) {
+    return {
+        phase: 'start',
+        source_index: -1,
+        bucket_index: -1,
+        bucket_value: null,
+        bucket_count: 0,
+        write_index: -1,
+        buckets: getDefaultCountingBuckets(initialArray),
+        output: [],
+    };
+}
+
+function normalizeCountingBuckets(step, initialArray) {
+    if (!Array.isArray(step?.buckets) || step.buckets.length === 0) {
+        return getDefaultCountingBuckets(initialArray);
+    }
+
+    return step.buckets.map((bucket) => ({
+        value: bucket?.value,
+        count: Number.isFinite(Number(bucket?.count)) ? Number(bucket.count) : 0,
+    }));
+}
+
+function normalizeCountingOutput(step) {
+    if (!Array.isArray(step?.output)) return [];
+    return step.output;
+}
+
+function getCountingPreviewSuffix(sourceLength, maxVisible) {
+    if (sourceLength <= maxVisible) return '';
+    return ` (показаны первые ${maxVisible} из ${sourceLength})`;
+}
+
+function createCountingSection(title, sectionClass) {
+    const section = document.createElement('div');
+    section.className = `counting-section ${sectionClass}`;
+
+    const heading = document.createElement('div');
+    heading.className = 'counting-heading';
+    heading.textContent = title;
+    section.appendChild(heading);
+
+    const row = document.createElement('div');
+    row.className = 'plot counting-row';
+    section.appendChild(row);
+
+    return { section, row };
+}
+
+function renderCountingSourceRow(row, initialArray, sourceIndex, phase, maxVisible) {
+    const visibleSource = initialArray.slice(0, maxVisible);
+    visibleSource.forEach((value, idx) => {
+        const cell = document.createElement('div');
+        const isActive = phase === 'count' && idx === sourceIndex;
+        cell.className = `cell ${isActive ? 'red' : 'blue'}`;
+        applyCellValue(cell, value);
+        row.appendChild(cell);
+    });
+}
+
+function renderCountingBucketsRow(row, buckets, bucketIndex, phase, maxVisible) {
+    buckets.slice(0, maxVisible).forEach((bucket, idx) => {
+        const cell = document.createElement('div');
+        const isActive = idx === bucketIndex && (phase === 'count' || phase === 'build');
+        const isDone = phase === 'done';
+        const color = isActive ? 'yellow' : (isDone ? 'green' : 'blue');
+        cell.className = `cell counting-bucket ${color}`;
+
+        const key = document.createElement('span');
+        key.className = 'counting-bucket-key';
+        key.textContent = String(bucket.value);
+
+        const count = document.createElement('span');
+        count.className = 'counting-bucket-count';
+        count.textContent = String(bucket.count);
+
+        cell.appendChild(key);
+        cell.appendChild(count);
+        row.appendChild(cell);
+    });
+}
+
+function renderCountingOutputRow(row, initialArrayLength, output, writeIndex, phase, maxVisible) {
+    const visibleLength = Math.min(initialArrayLength, maxVisible);
+    for (let idx = 0; idx < visibleLength; idx++) {
+        const cell = document.createElement('div');
+        const hasValue = idx < output.length;
+        const isActiveWrite = phase === 'build' && idx === writeIndex;
+
+        if (hasValue) {
+            cell.className = `cell ${isActiveWrite ? 'yellow' : 'green'}`;
+            applyCellValue(cell, output[idx]);
+        } else {
+            cell.className = 'cell counting-output-empty';
+            cell.textContent = '';
+        }
+        row.appendChild(cell);
+    }
+}
+
+function formatCountingStatus(step, stepIndex, historyLength, initialArrayLength, maxVisible) {
+    const previewSuffix = getCountingPreviewSuffix(initialArrayLength, maxVisible);
+    if (step.phase === 'start') {
+        return `Старт: инициализация корзин${previewSuffix}`;
+    }
+    if (step.phase === 'count') {
+        return `🔢 Подсчёт: a[${step.source_index}] = ${step.bucket_value} → корзина ${step.bucket_value} = ${step.bucket_count}${previewSuffix}`;
+    }
+    if (step.phase === 'build') {
+        return `📦 Сборка: ${step.bucket_value} записан в sorted[${step.write_index}]${previewSuffix}`;
+    }
+    if (step.phase === 'done' || stepIndex === historyLength - 1) {
+        const output = normalizeCountingOutput(step).slice(0, maxVisible);
+        return `✅ Готово: [${output.join(', ')}]${previewSuffix}`;
+    }
+    return `Шаг ${stepIndex + 1} из ${historyLength}${previewSuffix}`;
+}
+
+function updateCountingStep(container, initialArray, step, stepIndex, historyLength, maxVisible) {
+    container.innerHTML = '';
+
+    const layout = document.createElement('div');
+    layout.className = 'counting-layout';
+
+    const sourceIndex = Number.isInteger(step?.source_index) ? step.source_index : -1;
+    const bucketIndex = Number.isInteger(step?.bucket_index) ? step.bucket_index : -1;
+    const writeIndex = Number.isInteger(step?.write_index) ? step.write_index : -1;
+    const phase = step?.phase ?? 'start';
+    const buckets = normalizeCountingBuckets(step, initialArray);
+    const output = normalizeCountingOutput(step);
+
+    const source = createCountingSection('Массив', 'counting-source-section');
+    renderCountingSourceRow(source.row, initialArray, sourceIndex, phase, maxVisible);
+
+    const bucketsSection = createCountingSection('Корзины', 'counting-buckets-section');
+    renderCountingBucketsRow(bucketsSection.row, buckets, bucketIndex, phase, maxVisible);
+
+    const outputSection = createCountingSection('Отсортированный массив', 'counting-output-section');
+    renderCountingOutputRow(outputSection.row, initialArray.length, output, writeIndex, phase, maxVisible);
+
+    layout.appendChild(source.section);
+    layout.appendChild(bucketsSection.section);
+    layout.appendChild(outputSection.section);
+    container.appendChild(layout);
+
+    return formatCountingStatus(step, stepIndex, historyLength, initialArray.length, maxVisible);
+}
+
 export function renderSortingCells(
     container,
     data,
@@ -402,6 +561,12 @@ export function renderSortingCells(
     maxVisible = data.length
 ) {
     container.innerHTML = '';
+    if (direction === 'counting') {
+        const previewStep = createCountingPreviewStep(data);
+        updateCountingStep(container, data, previewStep, 0, 1, maxVisible);
+        return;
+    }
+
     const visibleData = data.slice(0, maxVisible);
     const safeSortedCount = sortedCount ?? 0;
 
@@ -432,6 +597,9 @@ export function updateSortingStep(
 
     if (direction === 'insertion' || isInsertionStep(step)) {
         return updateInsertionStep(container, history, initialArray, stepIndex, speed, maxVisible);
+    }
+    if (direction === 'counting' || isCountingStep(step)) {
+        return updateCountingStep(container, initialArray, step, stepIndex, history.length, maxVisible);
     }
     return updateSwapStep(container, history, initialArray, step, stepIndex, speed, direction, maxVisible);
 }
@@ -494,6 +662,10 @@ export function formatStatus(data, step, idx, total, sourceLength = data.length)
             return `↪ Сдвиг: ${step.value} из ${step.compare_a} в ${step.compare_b}${previewSuffix}`;
         }
         return `📌 Вставка: ${step.value} в позицию ${step.compare_b}${previewSuffix}`;
+    }
+
+    if (isCountingStep(step)) {
+        return formatCountingStatus(step, idx, total, sourceLength, data.length);
     }
 
     if (idx === 0) {

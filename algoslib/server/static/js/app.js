@@ -43,6 +43,13 @@ const SORTING_META = {
         time: "Время: O(n²)",
         memory: "Память: О(1)",
         direction: "insertion"
+    },
+    counting: {
+        title: "Counting Sort",
+        desc: "Подсчитывает количество вхождений каждого значения и затем собирает отсортированный массив",
+        time: "Время: O(n + k)",
+        memory: "Память: О(k)",
+        direction: "counting"
     }
 };
 const MAX_SORT_ITEMS = 15;

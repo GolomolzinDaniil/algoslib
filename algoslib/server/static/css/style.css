@@ -383,6 +383,55 @@ select {
     background: var(--green);
 }
 
+.counting-layout {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.counting-section {
+    width: 100%;
+}
+
+.counting-heading {
+    margin-bottom: 6px;
+    color: var(--text-muted);
+    font-size: 13px;
+    text-align: left;
+}
+
+.counting-row {
+    justify-content: flex-start;
+}
+
+.counting-bucket {
+    width: 72px;
+    height: 56px;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 4px;
+}
+
+.counting-bucket-key {
+    font-size: 11px;
+    line-height: 1;
+    opacity: 0.85;
+}
+
+.counting-bucket-count {
+    font-size: 18px;
+    line-height: 1;
+    font-weight: 700;
+}
+
+.counting-output-empty {
+    background: transparent;
+    border: 2px dashed var(--border);
+    color: var(--text-muted);
+    box-shadow: none;
+}
+
 .controls {
     display: flex;
     justify-content: center;
@@ -533,5 +582,14 @@ input[type="range"] {
     .btn {
         width: 100%;
         justify-content: center;
+    }
+
+    .counting-bucket {
+        width: 64px;
+        height: 52px;
+    }
+
+    .counting-bucket-count {
+        font-size: 16px;
     }
 }
