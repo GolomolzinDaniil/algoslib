@@ -40,6 +40,7 @@ extensions = [
             'lib/graphs/src/bellman_ford.cpp',
             'lib/graphs/src/kruskal.cpp',
             'lib/graphs/src/ford_fulkerson.cpp',
+            'lib/graphs/src/edmonds_karp.cpp',
         ],
         include_dirs=[
             pybind11.get_include(),

@@ -21,13 +21,18 @@ except ImportError:
 
 try:
     from .sub_graphs import Flow_Graph, FordFulkerson_Step, FordFulkerson_Result, ford_fulkerson
+    from .sub_graphs import EdmondsKarp_Step, EdmondsKarp_Result, edmonds_karp
 except ImportError:
     Flow_Graph = None
     FordFulkerson_Step = None
     FordFulkerson_Result = None
     ford_fulkerson = None
+    EdmondsKarp_Step = None
+    EdmondsKarp_Result = None
+    edmonds_karp = None
 
 __all__ = ['bfs', 'Graph', 'BFS_Step', 'Weighted_Graph', 'Dijkstra_Step', 'dijkstra',
            'Ford_Step', 'bellman_ford', 'Kruskal_Step', 'kruskal',
            'Flow_Graph', 'FordFulkerson_Step', 'FordFulkerson_Result', 'ford_fulkerson',
+           'EdmondsKarp_Step', 'EdmondsKarp_Result', 'edmonds_karp',
           ]

@@ -7,6 +7,7 @@
 #include "bellman_ford.hpp"
 #include "kruskal.hpp"
 #include "ford_fulkerson.hpp"
+#include "edmonds_karp.hpp"
 
 namespace py = pybind11;
 
@@ -128,4 +129,29 @@ PYBIND11_MODULE(sub_graphs, m) {
           &ford_fulkerson,
           py::arg("graph"), py::arg("source"), py::arg("sink"),
           "Алгоритм Форда-Фалкерсона. Возвращает FordFulkerson_Result");
+    
+    py::class_<EdmondsKarp_Step>(m, "EdmondsKarp_Step")
+    .def_readonly("iteration", &EdmondsKarp_Step::iteration,
+                  "Номер итерации")
+    .def_readonly("augmenting_path", &EdmondsKarp_Step::augmenting_path,
+                  "Увеличивающий путь")
+    .def_readonly("flow_increase", &EdmondsKarp_Step::flow_increase,
+                  "Увеличение потока")
+    .def_readonly("total_flow", &EdmondsKarp_Step::total_flow,
+                  "Накопленный поток")
+    .def_readonly("residual_capacities", &EdmondsKarp_Step::residual_capacities,
+                  "Остаточные пропускные способности");
+
+    py::class_<EdmondsKarp_Result>(m, "EdmondsKarp_Result")
+        .def_readonly("max_flow", &EdmondsKarp_Result::max_flow,
+                    "Максимальный поток")
+        .def_readonly("flow", &EdmondsKarp_Result::flow,
+                    "Поток по рёбрам")
+        .def_readonly("history", &EdmondsKarp_Result::history,
+                    "История шагов");
+
+    m.def("edmonds_karp", 
+        &edmonds_karp,
+        py::arg("graph"), py::arg("source"), py::arg("sink"),
+        "Алгоритм Эдмондса-Карпа (BFS версия Форда-Фалкерсона)");
 }
