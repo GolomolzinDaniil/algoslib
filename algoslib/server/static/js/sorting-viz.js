@@ -466,9 +466,7 @@ function renderCountingBucketsRow(row, buckets, bucketIndex, phase, maxVisible) 
     buckets.slice(0, maxVisible).forEach((bucket, idx) => {
         const cell = document.createElement('div');
         const isActive = idx === bucketIndex && (phase === 'count' || phase === 'build');
-        const isDone = phase === 'done';
-        const color = isActive ? 'yellow' : (isDone ? 'green' : 'blue');
-        cell.className = `cell counting-bucket ${color}`;
+        cell.className = `cell counting-bucket yellow${isActive ? ' counting-bucket-active' : ''}`;
 
         const key = document.createElement('span');
         key.className = 'counting-bucket-key';

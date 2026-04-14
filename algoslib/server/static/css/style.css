@@ -398,11 +398,11 @@ select {
     margin-bottom: 6px;
     color: var(--text-muted);
     font-size: 13px;
-    text-align: left;
+    text-align: center;
 }
 
 .counting-row {
-    justify-content: flex-start;
+    justify-content: center;
 }
 
 .counting-bucket {
@@ -423,6 +423,11 @@ select {
     font-size: 18px;
     line-height: 1;
     font-weight: 700;
+}
+
+.counting-bucket-active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(178, 201, 238, 0.28);
 }
 
 .counting-output-empty {
