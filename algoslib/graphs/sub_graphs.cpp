@@ -7,6 +7,8 @@
 #include "bellman_ford.hpp"
 #include "kruskal.hpp"
 #include "stalin_sort.hpp"
+#include "ford_fulkerson.hpp"
+#include "edmonds_karp.hpp"
 
 namespace py = pybind11;
 
@@ -113,4 +115,64 @@ PYBIND11_MODULE(sub_graphs, m) {
           py::arg("graph"),
           "Сталин-сорт для графов. Возвращает список шагов (List[Stalin_Step]). "
           "Оставляет только вершины, образующие клику, остальные ссылает.");
+
+    py::class_<Flow_Graph>(m, "Flow_Graph")
+        .def(py::init<>())
+        .def("add_edge", 
+             &Flow_Graph::add_edge, 
+             py::arg("u"), py::arg("v"), py::arg("capacity"),
+             "Добавить ребро с пропускной способностью")
+        .def("get_neighbors", 
+             &Flow_Graph::get_neighbors,
+             "Вернуть список соседей с пропускными способностями");
+
+    py::class_<FordFulkerson_Step>(m, "FordFulkerson_Step")
+        .def_readonly("iteration", &FordFulkerson_Step::iteration,
+                      "Номер итерации (найденного увеличивающего пути)")
+        .def_readonly("augmenting_path", &FordFulkerson_Step::augmenting_path,
+                      "Список вершин увеличивающего пути от source к sink")
+        .def_readonly("flow_increase", &FordFulkerson_Step::flow_increase,
+                      "Величина увеличения потока на этой итерации")
+        .def_readonly("total_flow", &FordFulkerson_Step::total_flow,
+                      "Накопленный максимальный поток")
+        .def_readonly("residual_capacities", &FordFulkerson_Step::residual_capacities,
+                      "Остаточные пропускные способности рёбер");
+
+    py::class_<FordFulkerson_Result>(m, "FordFulkerson_Result")
+        .def_readonly("max_flow", &FordFulkerson_Result::max_flow,
+                      "Максимальный поток от source к sink")
+        .def_readonly("flow", &FordFulkerson_Result::flow,
+                      "Поток по каждому ребру: {u: {v: flow}}")
+        .def_readonly("history", &FordFulkerson_Result::history,
+                      "История выполнения алгоритма (список шагов)");
+
+    m.def("ford_fulkerson", 
+          &ford_fulkerson,
+          py::arg("graph"), py::arg("source"), py::arg("sink"),
+          "Алгоритм Форда-Фалкерсона. Возвращает FordFulkerson_Result");
+    
+    py::class_<EdmondsKarp_Step>(m, "EdmondsKarp_Step")
+    .def_readonly("iteration", &EdmondsKarp_Step::iteration,
+                  "Номер итерации")
+    .def_readonly("augmenting_path", &EdmondsKarp_Step::augmenting_path,
+                  "Увеличивающий путь")
+    .def_readonly("flow_increase", &EdmondsKarp_Step::flow_increase,
+                  "Увеличение потока")
+    .def_readonly("total_flow", &EdmondsKarp_Step::total_flow,
+                  "Накопленный поток")
+    .def_readonly("residual_capacities", &EdmondsKarp_Step::residual_capacities,
+                  "Остаточные пропускные способности");
+
+    py::class_<EdmondsKarp_Result>(m, "EdmondsKarp_Result")
+        .def_readonly("max_flow", &EdmondsKarp_Result::max_flow,
+                    "Максимальный поток")
+        .def_readonly("flow", &EdmondsKarp_Result::flow,
+                    "Поток по рёбрам")
+        .def_readonly("history", &EdmondsKarp_Result::history,
+                    "История шагов");
+
+    m.def("edmonds_karp",
+        &edmonds_karp,
+        py::arg("graph"), py::arg("source"), py::arg("sink"),
+        "Алгоритм Эдмондса-Карпа (BFS версия Форда-Фалкерсона)");
 }

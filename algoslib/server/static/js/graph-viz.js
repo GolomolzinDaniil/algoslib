@@ -21,6 +21,11 @@ const COLORS = {
     nodeText:    '#1e1e1e',
     exiledText:  '#666666',
     distText:    '#cccccc',
+    source:      '#4ec9b0',
+    sink:        '#f38ba8',
+    pathEdge:    '#ce9178',
+    reverseEdge: '#7a7a7a',
+    residualText: '#9cdcfe',
 };
 
 const NODE_R = 22;
@@ -133,6 +138,189 @@ export function updateGraphStep(svg, nodes, edges, step, algorithm, nodeLabels =
     return formatInfo(step, algorithm, nodeLabels);
 }
 
+
+export function renderFlowGraph(svg, nodes, edges, source, sink, nodeLabels = {}) {
+    positions = forceLayout(nodes, edges, W, H, currentSpacing);
+    drawFlowGraph(svg, nodes, edges, source, sink, new Set(), {}, nodeLabels);
+}
+
+export function updateFlowGraphStep(svg, nodes, edges, step, source, sink, nodeLabels = {}) {
+    const pathEdges = new Set();
+    const path = step.augmenting_path || [];
+    for (let i = 0; i < path.length - 1; i++) {
+        pathEdges.add(`${path[i]}-${path[i + 1]}`);
+    }
+
+    drawFlowGraph(svg, nodes, edges, source, sink, pathEdges, step.residual_capacities || {}, nodeLabels);
+    return formatFlowInfo(step, source, sink, nodeLabels);
+}
+
+function drawFlowGraph(svg, nodes, edges, source, sink, pathEdges, residual, nodeLabels = {}) {
+    let html = '';
+    const allEdges = [];
+    const edgeMap = new Map();
+    
+    for (const edge of edges) {
+        const u = edge[0]; 
+        const v = edge[1];
+        const cap = edge[2];
+        const key = `${u}-${v}`;
+        
+        allEdges.push({ u, v, cap, isOriginal: true });
+        edgeMap.set(key, true);
+    }
+    
+    for (const [u, targets] of Object.entries(residual)) {
+        for (const [v, resCap] of Object.entries(targets)) {
+            const uId = parseInt(u);
+            const vId = parseInt(v);
+            const key = `${uId}-${vId}`;
+            
+            if (resCap > 1e-9 && !edgeMap.has(key)) {
+                allEdges.push({ 
+                    u: uId, 
+                    v: vId, 
+                    cap: resCap, 
+                    isOriginal: false 
+                });
+                edgeMap.set(key, true);
+            }
+        }
+    }
+
+    for (const edgeData of allEdges) {
+        const { u, v } = edgeData;
+        const reverseKey = `${v}-${u}`;
+        edgeData.hasPair = edgeMap.has(reverseKey);
+    }
+
+    for (const edgeData of allEdges) {
+        const { u, v, cap, isOriginal, hasPair } = edgeData;
+        
+        const p1 = positions[u]; 
+        const p2 = positions[v];
+        
+        if (!p1 || !p2) {
+            console.warn(`No position for edge ${u}→${v} (IDs). nodeLabels:`, nodeLabels);
+            continue;
+        }
+
+        const edgeKey = `${u}-${v}`;
+        const isReverse = !isOriginal;
+        
+        let color = isReverse ? COLORS.reverseEdge : COLORS.defaultEdge;
+        let strokeWidth = isReverse ? 1.5 : 2.5;
+        let strokeDash = isReverse ? '4,4' : 'none';
+
+        if (pathEdges.has(edgeKey)) {
+            color = COLORS.pathEdge;
+            strokeWidth = 4;
+            strokeDash = 'none';
+        }
+
+        if (hasPair) {
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            
+            const nx = -dy / dist;
+            const ny = dx / dist;
+            const offset = 25;
+            const direction = 1;
+            
+            const midX = (p1.x + p2.x) / 2;
+            const midY = (p1.y + p2.y) / 2;
+            const ctrlX = midX + nx * offset * direction;
+            const ctrlY = midY + ny * offset * direction;
+            
+            html += `<path d="M ${p1.x} ${p1.y} Q ${ctrlX} ${ctrlY} ${p2.x} ${p2.y}"
+                           fill="none"
+                           stroke="${color}" stroke-width="${strokeWidth}" 
+                           stroke-dasharray="${strokeDash}"
+                           stroke-linecap="round" marker-end="url(#arrowhead)"/>`;
+            
+            const textX = ctrlX;
+            const textY = ctrlY - 10;
+            const resCap = residual[String(u)]?.[String(v)];
+            const capText = resCap !== undefined ? Number(resCap).toFixed(1) : String(cap);
+            
+            html += `<rect x="${textX - 22}" y="${textY - 9}" width="44" height="18" rx="3"
+                           fill="${isReverse ? '#2a2a2a' : '#1e1e1e'}" 
+                           stroke="#3e3e42" stroke-width="1"/>`;
+            html += `<text x="${textX}" y="${textY + 5}" text-anchor="middle"
+                           fill="${isReverse ? COLORS.residualText : COLORS.distText}" 
+                           font-size="10"
+                           font-family="'JetBrains Mono', monospace">
+                ${capText}${isReverse ? '↩' : ''}
+            </text>`;
+        } else {
+            html += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}"
+                           stroke="${color}" stroke-width="${strokeWidth}" 
+                           stroke-dasharray="${strokeDash}"
+                           stroke-linecap="round" marker-end="url(#arrowhead)"/>`;
+            
+            const mx = (p1.x + p2.x) / 2;
+            const my = (p1.y + p2.y) / 2 - 10;
+            const resCap = residual[String(u)]?.[String(v)];
+            const capText = resCap !== undefined ? Number(resCap).toFixed(1) : String(cap);
+            
+            html += `<rect x="${mx - 22}" y="${my - 9}" width="44" height="18" rx="3"
+                           fill="${isReverse ? '#2a2a2a' : '#1e1e1e'}" 
+                           stroke="#3e3e42" stroke-width="1"/>`;
+            html += `<text x="${mx}" y="${my + 5}" text-anchor="middle"
+                           fill="${isReverse ? COLORS.residualText : COLORS.distText}" 
+                           font-size="10"
+                           font-family="'JetBrains Mono', monospace">
+                ${capText}${isReverse ? '↩' : ''}
+            </text>`;
+        }
+    }
+
+    for (const nodeId of nodes) {  
+        const p = positions[nodeId];
+        if (!p) continue;
+        
+        const label = nodeLabels[String(nodeId)] || String(nodeId);  
+        
+        let fill = COLORS.defaultNode;
+        let stroke = '#1e1e1e';
+        let strokeWidth = 2.5;
+        
+        if (nodeId === source) {
+            fill = COLORS.source;
+            stroke = '#4ec9b0';
+            strokeWidth = 3;
+        } else if (nodeId === sink) {
+            fill = COLORS.sink;
+            stroke = '#f44747';
+            strokeWidth = 3;
+        }
+
+        html += `<circle cx="${p.x}" cy="${p.y}" r="${NODE_R}"
+                         fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
+        html += `<text x="${p.x}" y="${p.y + 5}" text-anchor="middle"
+                       fill="${COLORS.nodeText}" font-size="15" font-weight="bold"
+                       font-family="'JetBrains Mono', monospace">${label}</text>`;
+    }
+
+    svg.innerHTML = html;
+}
+
+function formatFlowInfo(step, source, sink, nodeLabels = {}) {
+    const lines = [];
+    lines.push(`<span class="label">Итерация:</span> <span class="value">${step.iteration}</span>`);
+    
+    const path = step.augmenting_path || [];
+    const pathString = Array.isArray(path) 
+        ? path.map(n => getNodeLabel(n, nodeLabels)).join(' → ') 
+        : '—';
+    lines.push(`<span class="label">Путь:</span> <span class="value">${pathString}</span>`);
+    
+    lines.push(`<span class="label">Увеличение:</span> <span class="value">+${Number(step.flow_increase).toFixed(2)}</span>`);
+    lines.push(`<span class="label">Макс. поток:</span> <span class="value">${Number(step.total_flow).toFixed(2)}</span>`);
+    
+    return lines.join('<br>');
+}
 function forceLayout(nodes, edges, w, h, spacing) {
     const s = (spacing || 5) / 5;
     const pad = NODE_R + 20;

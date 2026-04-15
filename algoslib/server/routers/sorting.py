@@ -18,6 +18,7 @@ gnome_sort_h = getattr(sub_sorting_cpp, "gnome_sort_h", None) if sub_sorting_cpp
 bogo_sort_h = getattr(sub_sorting_cpp, "bogo_sort_h", None) if sub_sorting_cpp else None
 quick_sort_h = getattr(sub_sorting_cpp, "quick_sort_h", None) if sub_sorting_cpp else None
 insertion_sort_h = getattr(sub_sorting_cpp, "insertion_sort_h", None) if sub_sorting_cpp else None
+counting_sort_h = getattr(sub_sorting_cpp, "counting_sort_h", None) if sub_sorting_cpp else None
 
 
 router = APIRouter()
@@ -265,6 +266,70 @@ def insertion_sort_history_py(data: list[float | int]) -> list[dict]:
     return history
 
 
+def counting_sort_history_py(data: list[float | int]) -> list[dict]:
+    arr = list(data)
+    bucket_keys = sorted(set(arr))
+    bucket_positions = {value: idx for idx, value in enumerate(bucket_keys)}
+    counts = {value: 0 for value in bucket_keys}
+    output: list[float | int] = []
+
+    def bucket_snapshot() -> list[dict]:
+        return [
+            {"value": key, "count": int(counts[key])}
+            for key in bucket_keys
+        ]
+
+    history = [{
+        "phase": "start",
+        "source_index": -1,
+        "bucket_index": -1,
+        "bucket_value": None,
+        "bucket_count": 0,
+        "write_index": -1,
+        "buckets": bucket_snapshot(),
+        "output": [],
+    }]
+
+    for idx, value in enumerate(arr):
+        counts[value] += 1
+        history.append({
+            "phase": "count",
+            "source_index": idx,
+            "bucket_index": bucket_positions[value],
+            "bucket_value": value,
+            "bucket_count": int(counts[value]),
+            "write_index": -1,
+            "buckets": bucket_snapshot(),
+            "output": [],
+        })
+
+    for bucket_idx, bucket_value in enumerate(bucket_keys):
+        for _ in range(counts[bucket_value]):
+            output.append(bucket_value)
+            history.append({
+                "phase": "build",
+                "source_index": -1,
+                "bucket_index": bucket_idx,
+                "bucket_value": bucket_value,
+                "bucket_count": int(counts[bucket_value]),
+                "write_index": len(output) - 1,
+                "buckets": bucket_snapshot(),
+                "output": list(output),
+            })
+
+    history.append({
+        "phase": "done",
+        "source_index": -1,
+        "bucket_index": -1,
+        "bucket_value": None,
+        "bucket_count": 0,
+        "write_index": -1,
+        "buckets": bucket_snapshot(),
+        "output": list(output),
+    })
+    return history
+
+
 def normalize_sort_step(step: dict, algo: str) -> dict:
     if algo == "bubble":
         return {
@@ -310,6 +375,14 @@ def normalize_sort_step(step: dict, algo: str) -> dict:
             "compare_b": int(step.get("compare_b", 0)),
             "is_shift": bool(step.get("is_shift", False)),
             "value": step.get("value"),
+        }
+    elif algo == "counting":
+        nums_elems = step.get("nums_elems", {})
+        return {
+            "nums_elems": {
+                key: int(value)
+                for key, value in nums_elems.items()
+            }
         }
     return step
 
@@ -497,6 +570,27 @@ async def run_insertion_sort(req: SortRequest):
             "sorted_array": get_sorted_array(data, "insertion"),
             "direction": "insertion",
             "algo": "insertion"
+        }
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
+@router.post("/counting")
+async def run_counting_sort(req: SortRequest):
+    try:
+        data = list(req.data)
+
+        # Для визуализации нужен расширенный формат шагов (count + build),
+        # поэтому используем python-генератор шагов.
+        history = counting_sort_history_py(data)
+
+        return {
+            "history": history,
+            "initial_array": data,
+            "sorted_array": get_sorted_array(data, "counting"),
+            "direction": "counting",
+            "algo": "counting"
         }
     except Exception as e:
         traceback.print_exc()
