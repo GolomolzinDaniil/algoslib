@@ -439,7 +439,7 @@ document.getElementById('graph-algo').addEventListener('change', (e) => {
     }
 
     const startInput = document.getElementById('graph-start');
-    if (algo === 'kruskal') {
+    if (algo === 'kruskal' || algo === 'stalin_sort') {
         startInput.disabled = true;
         startInput.placeholder = 'Не требуется';
     } else {
@@ -458,6 +458,9 @@ document.getElementById('graph-example').addEventListener('click', () => {
         document.getElementById('graph-start').value = '0';
     } else if (algo === 'kruskal') {
         document.getElementById('graph-edges').value = '0 1 4\n0 2 2\n1 2 1\n1 3 5\n2 3 8\n2 4 10\n3 4 2\n3 5 6\n4 5 3';
+        document.getElementById('graph-start').value = '';
+    } else if (algo === 'stalin_sort') {
+        document.getElementById('graph-edges').value = '0 1\n0 2\n1 2\n2 3\n3 4\n1 4';
         document.getElementById('graph-start').value = '';
     } else {
         document.getElementById('graph-edges').value = '0 1\n0 2\n1 3\n2 3\n3 4\n4 5\n2 5';
@@ -490,6 +493,9 @@ document.getElementById('graph-example').addEventListener('click', () => {
     } else if (algo === 'kruskal') {
         document.getElementById('graph-edges').value = 'A B 4\nA C 2\nB C 1\nB D 5\nC D 8\nC E 10\nD E 2\nD F 6\nE F 3';
         document.getElementById('graph-start').value = '';
+    } else if (algo === 'stalin_sort') {
+        document.getElementById('graph-edges').value = 'A B\nA C\nB C\nC D\nD E\nB E';
+        document.getElementById('graph-start').value = '';
     } else {
         document.getElementById('graph-edges').value = 'A B\nA C\nB D\nC D\nD E\nE F\nC F';
         document.getElementById('graph-start').value = 'A';
@@ -506,7 +512,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
         return;
     }
 
-    if (!startNode && algo !== 'kruskal') {
+    if (!startNode && algo !== 'kruskal' && algo !== 'stalin_sort') {
         graphPlayer.el.status.textContent = 'Введите стартовую ноду';
         return;
     }
@@ -525,6 +531,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
         } else if (parts.length >= 2) {
             edges.push([parts[0], parts[1]]);
         }
+
     }
 
     if (edges.length === 0) {
@@ -535,7 +542,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
     graphPlayer.el.status.textContent = 'Загрузка...';
 
     try {
-        const reqBody = algo === 'kruskal'
+        const reqBody = (algo === 'kruskal' || algo === 'stalin_sort')
             ? { edges }
             : { edges, start_node: startNode };
         const res = await fetch(`/api/graphs/${algo}`, {
@@ -570,6 +577,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
             algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal',
             graphData.nodeLabels
         );
+
         renderGraphStepAt(0);
     } catch (e) {
         graphPlayer.el.status.textContent = `Ошибка: ${e.message}`;
