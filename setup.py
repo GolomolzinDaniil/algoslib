@@ -50,6 +50,21 @@ extensions = [
         extra_compile_args=compile_flags,
         # extra_link_args=
     ),
+
+    # searches
+    Extension(
+        name='algoslib.searches.sub_searches',
+        sources=[
+            'algoslib/searches/sub_searches.cpp',
+        ],
+        include_dirs=[
+            pybind11.get_include(),
+            'lib/searches/include/'
+        ],
+        language='c++',
+        extra_compile_args=compile_flags,
+        # extra_link_args=
+    ),
 ]
 
 setup(
@@ -58,6 +73,7 @@ setup(
     zip_safe=False,
     package_data={
         'algoslib.sorting': ['sub_sorting.pyi'],
-        'algoslib.graphs' : ['sub_graphs.pyi']
+        'algoslib.graphs' : ['sub_graphs.pyi'],
+        'algoslib.searches' : ['sub_searches.pyi']
     },
 )
