@@ -1,5 +1,6 @@
 import { renderSortingCells, updateSortingStep } from './sorting-viz.js';
 import { renderGraph, updateGraphStep, setSpacing, renderFlowGraph, updateFlowGraphStep } from './graph-viz.js';
+import { renderSearchCells, updateSearchStep } from './searche-viz.js';
 
 const SORTING_META = {
     bubble: {
@@ -54,9 +55,21 @@ const SORTING_META = {
 };
 const MAX_SORT_ITEMS = 15;
 const MAX_SORT_VISUAL_ITEMS = 15;
+const MAX_SEARCH_ITEMS = 15;
+const MAX_SEARCH_VISUAL_ITEMS = 15;
+
+const SEARCH_META = {
+    linear_searche: {
+        title: "Linear Search",
+        desc: "Линейно проходит по массиву и сравнивает каждый элемент с искомым значением",
+        time: "Время: O(n)",
+        memory: "Память: О(1)",
+    },
+};
 
 document.addEventListener('DOMContentLoaded', () => {
     initSortingPage();
+    initSearchPage();
     if (window.lucide) setTimeout(() => lucide.createIcons(), 100);
 });
 
@@ -86,6 +99,37 @@ function initSortingPage() {
     uploadedSortData = null;
 }
 
+function initSearchPage() {
+    const header = document.getElementById('search-header');
+    if (header) {
+        header.style.display = 'block';
+        document.getElementById('search-title').textContent = 'Поиск';
+        document.getElementById('search-desc').textContent = 'Выберите алгоритм поиска и введите данные';
+        document.getElementById('search-time').textContent = '';
+        document.getElementById('search-memory').textContent = '';
+    }
+
+    const algoSelect = document.getElementById('search-algo');
+    if (algoSelect) algoSelect.value = '';
+
+    const plot = document.getElementById('search-plot');
+    if (plot) plot.innerHTML = '';
+
+    const status = document.getElementById('search-status');
+    if (status) status.textContent = '';
+
+    const controls = document.getElementById('search-controls');
+    if (controls) controls.style.display = 'none';
+
+    if (searchTargetInput && searchTargetInput.value.trim() === '') {
+        searchTargetInput.value = '4';
+    }
+
+    if (typeof resetSearchSession === 'function') {
+        resetSearchSession();
+    }
+}
+
 document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -95,6 +139,8 @@ document.querySelectorAll('.tab').forEach(tab => {
 
         if (tab.dataset.tab === 'sorting') {
             initSortingPage();
+        } else if (tab.dataset.tab === 'searches') {
+            initSearchPage();
         }
     });
 });
@@ -142,15 +188,28 @@ function createPlayer(prefix) {
 
 const sortPlayer = createPlayer('sort');
 const graphPlayer = createPlayer('graph');
+const searchPlayer = createPlayer('search');
 
 let graphData = { nodes: [], edges: [], algorithm: 'bfs', nodeLabels: {}, source: null, sink: null };
 let sortData = { history: [], initialArray: [], sortedArray: [] };
+let searchData = {
+    steps: [],
+    initialArray: [],
+    result: [],
+    target: null,
+    source: '',
+};
 let uploadedSortData = null;
 const sortPlot = document.getElementById('sort-plot');
 const sortDataInput = document.getElementById('sort-data');
 const sortFileInput = document.getElementById('sort-file');
 const sortFileName = document.getElementById('sort-file-name');
 const sortDownloadFileBtn = document.getElementById('sort-download-file');
+const searchPlot = document.getElementById('search-plot');
+const searchResultIndexes = document.getElementById('search-result-indexes');
+const searchDataInput = document.getElementById('search-data');
+const searchTargetInput = document.getElementById('search-target');
+const searchAlgoSelect = document.getElementById('search-algo');
 
 function parseSortInput(raw) {
     return raw
@@ -420,6 +479,273 @@ function renderSortStep(idx) {
     );
     sortPlayer.el.status.textContent = msg;
 }
+
+function parseSearchTarget(raw) {
+    const value = parseFloat(String(raw ?? '').trim());
+    if (Number.isNaN(value)) {
+        throw new Error('Введите искомое значение');
+    }
+    return value;
+}
+
+function setSearchResultIndexes(indexes) {
+    if (!searchResultIndexes) return;
+
+    if (!Array.isArray(indexes) || indexes.length === 0) {
+        searchResultIndexes.innerHTML = '';
+        return;
+    }
+
+    const value = indexes.join(', ');
+    searchResultIndexes.innerHTML =
+        `<div class="search-result-chip">` +
+        `<span class="search-result-label">Индексы искомого элемента:</span>` +
+        `<span class="search-result-value">${value}</span>` +
+        `</div>`;
+}
+
+function resetSearchSession() {
+    stopPlayer(searchPlayer);
+    searchPlayer.steps = [];
+    searchPlayer.current = 0;
+    searchData = {
+        steps: [],
+        initialArray: [],
+        result: [],
+        target: null,
+        source: '',
+    };
+    if (searchPlot) searchPlot.innerHTML = '';
+    setSearchResultIndexes([]);
+    if (searchPlayer.el.status) searchPlayer.el.status.textContent = '';
+}
+
+function renderSearchInputPreview() {
+    if (!searchPlot) return;
+    const data = parseSortInput(searchDataInput?.value || '');
+    if (data.length === 0) {
+        searchPlot.innerHTML = '';
+        return;
+    }
+    renderSearchCells(searchPlot, data, -1, [], -1, MAX_SEARCH_VISUAL_ITEMS);
+}
+
+function buildSearchSteps(data, resultIndexes) {
+    const safeData = Array.isArray(data) ? data : [];
+    const safeResultIndexes = Array.isArray(resultIndexes)
+        ? resultIndexes
+            .map((idx) => Number(idx))
+            .filter((idx) => Number.isInteger(idx) && idx >= 0 && idx < safeData.length)
+        : [];
+    const resultSet = new Set(safeResultIndexes);
+    const foundSoFar = [];
+    const steps = [];
+
+    for (let idx = 0; idx < safeData.length; idx++) {
+        const isMatch = resultSet.has(idx);
+        if (isMatch) foundSoFar.push(idx);
+        steps.push({
+            current_index: idx,
+            checked_until: idx,
+            found_indices: [...foundSoFar],
+            is_match: isMatch,
+        });
+    }
+
+    return steps;
+}
+
+function applySearchResult(apiResult, data, target) {
+    const resultIndexes = Array.isArray(apiResult?.result) ? apiResult.result : [];
+    const steps = buildSearchSteps(data, resultIndexes);
+
+    searchData = {
+        steps,
+        initialArray: [...data],
+        result: [...resultIndexes],
+        target,
+        source: apiResult?.source || 'python',
+    };
+    searchPlayer.steps = steps;
+    searchPlayer.current = 0;
+    searchPlayer.el.controls.style.display = 'flex';
+
+    if (searchData.initialArray.length === 0) {
+        searchPlot.innerHTML = '';
+        setSearchResultIndexes([]);
+        searchPlayer.el.status.textContent = 'Нет данных для визуализации';
+        return;
+    }
+
+    if (searchData.steps.length === 0) {
+        renderSearchCells(searchPlot, searchData.initialArray, -1, [], -1, MAX_SEARCH_VISUAL_ITEMS);
+        setSearchResultIndexes([]);
+        searchPlayer.el.status.textContent = 'Совпадений нет';
+        return;
+    }
+
+    setSearchResultIndexes([]);
+
+    const firstStep = searchData.steps[0];
+    renderSearchCells(
+        searchPlot,
+        searchData.initialArray,
+        firstStep.current_index,
+        firstStep.found_indices,
+        firstStep.checked_until,
+        MAX_SEARCH_VISUAL_ITEMS
+    );
+
+    renderSearchStep(0);
+}
+
+async function loadSearchData() {
+    const data = parseSortInput(searchDataInput?.value || '');
+    if (data.length === 0) {
+        throw new Error('Введите числа через запятую');
+    }
+
+    if (data.length > MAX_SEARCH_ITEMS) {
+        throw new Error(`Можно ввести максимум ${MAX_SEARCH_ITEMS} чисел`);
+    }
+
+    const algo = searchAlgoSelect?.value;
+    if (!algo) {
+        throw new Error('Выберите алгоритм поиска');
+    }
+
+    const target = parseSearchTarget(searchTargetInput?.value);
+
+    const res = await fetch(`/api/searches/${algo}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data, target }),
+    });
+
+    if (!res.ok) {
+        let msg = res.statusText;
+        try { const j = await res.json(); msg = j.detail || msg; } catch { }
+        throw new Error(msg);
+    }
+
+    const payload = await res.json();
+    return { payload, data, target };
+}
+
+function renderSearchStep(idx) {
+    const msg = updateSearchStep(
+        searchPlot,
+        searchData.steps,
+        searchData.initialArray,
+        idx,
+        MAX_SEARCH_VISUAL_ITEMS
+    );
+    searchPlayer.el.status.textContent = msg;
+
+    const isLastStep = searchData.steps.length > 0 && idx >= searchData.steps.length - 1;
+    if (isLastStep) {
+        setSearchResultIndexes(searchData.result);
+    } else {
+        setSearchResultIndexes([]);
+    }
+}
+
+if (searchAlgoSelect) {
+    searchAlgoSelect.addEventListener('change', (e) => {
+        const algo = e.target.value;
+        resetSearchSession();
+
+        if (algo && SEARCH_META[algo]) {
+            const meta = SEARCH_META[algo];
+            searchPlayer.el.controls.style.display = 'flex';
+            document.getElementById('search-title').textContent = meta.title;
+            document.getElementById('search-desc').textContent = meta.desc;
+            document.getElementById('search-time').textContent = meta.time;
+            document.getElementById('search-memory').textContent = meta.memory;
+            renderSearchInputPreview();
+        } else {
+            searchPlayer.el.controls.style.display = 'none';
+            document.getElementById('search-title').textContent = 'Поиск';
+            document.getElementById('search-desc').textContent = 'Выберите алгоритм поиска и введите данные';
+            document.getElementById('search-time').textContent = '';
+            document.getElementById('search-memory').textContent = '';
+        }
+    });
+}
+
+if (searchDataInput) {
+    searchDataInput.addEventListener('input', (e) => {
+        const input = e.target;
+        const numbers = parseSortInput(input.value);
+        let isClamped = false;
+
+        if (numbers.length > MAX_SEARCH_ITEMS) {
+            input.value = numbers.slice(0, MAX_SEARCH_ITEMS).join(', ');
+            isClamped = true;
+        }
+
+        resetSearchSession();
+        renderSearchInputPreview();
+        if (isClamped) {
+            searchPlayer.el.status.textContent = `Можно ввести максимум ${MAX_SEARCH_ITEMS} чисел`;
+        }
+    });
+}
+
+if (searchTargetInput) {
+    searchTargetInput.addEventListener('input', () => {
+        resetSearchSession();
+        renderSearchInputPreview();
+    });
+}
+
+searchPlayer.el.play.addEventListener('click', async () => {
+    const algo = searchAlgoSelect?.value;
+    if (!algo) {
+        searchPlayer.el.status.textContent = 'Выберите алгоритм поиска';
+        return;
+    }
+
+    if (searchPlayer.steps.length === 0 || !searchData.initialArray.length) {
+        searchPlayer.el.status.textContent = 'Загрузка...';
+        try {
+            const { payload, data, target } = await loadSearchData();
+            applySearchResult(payload, data, target);
+        } catch (e) {
+            searchPlayer.el.status.textContent = `Ошибка: ${e.message}`;
+            console.error(e);
+            return;
+        }
+    }
+
+    if (searchPlayer.playing) {
+        stopPlayer(searchPlayer);
+    } else {
+        startPlayer(searchPlayer, renderSearchStep);
+    }
+});
+
+searchPlayer.el.prev.addEventListener('click', () => {
+    if (searchPlayer.current > 0) {
+        stopPlayer(searchPlayer);
+        searchPlayer.current--;
+        renderSearchStep(searchPlayer.current);
+    }
+});
+
+searchPlayer.el.next.addEventListener('click', () => {
+    if (searchPlayer.current < searchPlayer.steps.length - 1) {
+        searchPlayer.current++;
+        renderSearchStep(searchPlayer.current);
+    } else {
+        stopPlayer(searchPlayer);
+    }
+});
+
+searchPlayer.el.speed.addEventListener('input', (e) => {
+    searchPlayer.speed = parseInt(e.target.value);
+    searchPlayer.el.speedVal.textContent = searchPlayer.speed + 'ms';
+});
 
 const graphSvg = document.getElementById('graph-svg');
 const graphInfo = document.getElementById('graph-info');
