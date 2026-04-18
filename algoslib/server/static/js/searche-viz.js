@@ -14,8 +14,8 @@ function toSafeIndexList(raw, upperBound) {
     return normalized;
 }
 
-function getCellColor(index, currentIndex, _checkedUntil, foundSet) {
-    if (index === currentIndex) return 'red';
+function getCellColor(index, currentSet, _checkedUntil, foundSet) {
+    if (currentSet.has(index)) return 'red';
     if (foundSet.has(index)) return 'green';
     return 'blue';
 }
@@ -33,10 +33,14 @@ export function renderSearchCells(
 
     const visible = Array.isArray(data) ? data.slice(0, maxVisible) : [];
     const foundSet = new Set(toSafeIndexList(foundIndexes, visible.length));
+    const currentIndexes = Array.isArray(currentIndex)
+        ? toSafeIndexList(currentIndex, visible.length)
+        : toSafeIndexList([currentIndex], visible.length);
+    const currentSet = new Set(currentIndexes);
 
     visible.forEach((value, idx) => {
         const cell = document.createElement('div');
-        cell.className = `cell ${getCellColor(idx, currentIndex, checkedUntil, foundSet)}`;
+        cell.className = `cell ${getCellColor(idx, currentSet, checkedUntil, foundSet)}`;
         cell.textContent = String(value);
         container.appendChild(cell);
     });
@@ -58,20 +62,29 @@ export function updateSearchStep(
     }
 
     const step = safeSteps[stepIndex] || {};
-    const currentIndex = Number.isInteger(step.current_index) ? step.current_index : -1;
-    const checkedUntil = Number.isInteger(step.checked_until) ? step.checked_until : currentIndex;
+    const currentIndicesRaw = Array.isArray(step.current_indices)
+        ? step.current_indices
+        : [step.current_index];
+    const currentIndices = toSafeIndexList(currentIndicesRaw, safeData.length);
+    const currentIndex = currentIndices.length > 0 ? currentIndices[0] : -1;
+    const checkedUntil = Number.isInteger(step.checked_until)
+        ? step.checked_until
+        : (currentIndices.length > 0 ? currentIndices[currentIndices.length - 1] : -1);
     const foundIndexes = toSafeIndexList(step.found_indices, safeData.length);
     const visibleFound = foundIndexes.filter((idx) => idx < maxVisible);
 
-    renderSearchCells(container, safeData, currentIndex, visibleFound, checkedUntil, maxVisible);
+    renderSearchCells(container, safeData, currentIndices, visibleFound, checkedUntil, maxVisible);
 
-    const currentValue =
-        currentIndex >= 0 && currentIndex < safeData.length ? safeData[currentIndex] : undefined;
+    const currentValues = currentIndices
+        .filter((idx) => idx >= 0 && idx < safeData.length)
+        .map((idx) => safeData[idx]);
     const matchLabel = step.is_match ? 'совпадение найдено' : 'совпадения нет';
     const stepLabel = `Шаг ${Math.min(stepIndex + 1, Math.max(1, safeSteps.length))} / ${Math.max(1, safeSteps.length)}`;
-    const inspectLabel =
-        currentIndex >= 0
-            ? `проверяем индекс ${currentIndex} (значение ${currentValue})`
-            : 'ожидание шага';
+    let inspectLabel = 'ожидание шага';
+    if (currentIndices.length === 1) {
+        inspectLabel = `проверяем индекс ${currentIndices[0]} (значение ${currentValues[0]})`;
+    } else if (currentIndices.length > 1) {
+        inspectLabel = `проверяем индексы ${currentIndices.join(' и ')} (значения ${currentValues.join(' и ')})`;
+    }
     return `${stepLabel} | ${inspectLabel} | ${matchLabel}`;
 }
