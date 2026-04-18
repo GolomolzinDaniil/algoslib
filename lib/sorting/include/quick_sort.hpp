@@ -43,6 +43,7 @@ std::vector<Quick_step> quick_sort_h(std::vector<T>& arr)
             {
                 std::swap(arr[i], arr[start]);
                 history.push_back({low, high, i, start, true});
+                start++;
             }
             else history.push_back({low, high, i, i, false});
         }

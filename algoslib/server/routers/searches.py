@@ -63,10 +63,6 @@ def _prepare_cpp_args(data: list[float | int], target: float | int) -> tuple[boo
     return True, normalized_data, normalized_target
 
 
-def _normalize_pair_history(raw_history: list[tuple[int | float, int | float]]) -> list[list[int]]:
-    return [[int(left), int(right)] for left, right in raw_history]
-
-
 def _require_cpp(func: object | None, algo_name: str) -> None:
     if func is None:
         raise HTTPException(
@@ -98,8 +94,8 @@ async def run_linear_searche(req: SearchRequest):
         target = req.target
         normalized_data, normalized_target = _get_normalized_cpp_args_or_400(data, target)
 
-        result = [int(idx) for idx in linear_searche_cpp(normalized_data, normalized_target)]
-        history = [int(idx) for idx in linear_searche_h_cpp(normalized_data, normalized_target)]
+        history = list(linear_searche_h_cpp(normalized_data, normalized_target))
+        result = list(linear_searche_cpp(normalized_data, normalized_target))
 
         return {
             "result": result,
@@ -124,10 +120,8 @@ async def run_linear_searche_both_sides(req: SearchRequest):
         target = req.target
         normalized_data, normalized_target = _get_normalized_cpp_args_or_400(data, target)
 
-        result = [int(idx) for idx in linear_searche_both_sides_cpp(normalized_data, normalized_target)]
-        history = _normalize_pair_history(
-            linear_searche_both_sides_h_cpp(normalized_data, normalized_target)
-        )
+        history = list(linear_searche_both_sides_h_cpp(normalized_data, normalized_target))
+        result = list(linear_searche_both_sides_cpp(normalized_data, normalized_target))
 
         return {
             "result": result,

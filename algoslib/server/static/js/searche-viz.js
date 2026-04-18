@@ -81,7 +81,9 @@ export function updateSearchStep(
     const matchLabel = step.is_match ? 'совпадение найдено' : 'совпадения нет';
     const stepLabel = `Шаг ${Math.min(stepIndex + 1, Math.max(1, safeSteps.length))} / ${Math.max(1, safeSteps.length)}`;
     let inspectLabel = 'ожидание шага';
-    if (currentIndices.length === 1) {
+    if (currentIndices.length === 0 && visibleFound.length > 0) {
+        inspectLabel = `результат: индекс(ы) ${visibleFound.join(', ')}`;
+    } else if (currentIndices.length === 1) {
         inspectLabel = `проверяем индекс ${currentIndices[0]} (значение ${currentValues[0]})`;
     } else if (currentIndices.length > 1) {
         inspectLabel = `проверяем индексы ${currentIndices.join(' и ')} (значения ${currentValues.join(' и ')})`;
