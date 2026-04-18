@@ -65,6 +65,12 @@ const SEARCH_META = {
         time: "Время: O(n)",
         memory: "Память: О(1)",
     },
+    linear_searche_both_sides: {
+        title: "Linear Search Both Sides",
+        desc: "Проверяет элементы одновременно с начала и конца массива",
+        time: "Время: O(n)",
+        memory: "Память: О(1)",
+    },
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -198,6 +204,7 @@ let searchData = {
     result: [],
     target: null,
     source: '',
+    historySource: '',
 };
 let uploadedSortData = null;
 const sortPlot = document.getElementById('sort-plot');
@@ -514,6 +521,7 @@ function resetSearchSession() {
         result: [],
         target: null,
         source: '',
+        historySource: '',
     };
     if (searchPlot) searchPlot.innerHTML = '';
     setSearchResultIndexes([]);
@@ -530,7 +538,22 @@ function renderSearchInputPreview() {
     renderSearchCells(searchPlot, data, -1, [], -1, MAX_SEARCH_VISUAL_ITEMS);
 }
 
-function buildSearchSteps(data, resultIndexes) {
+function appendSearchFinalStep(steps, resultIndexes) {
+    if (!Array.isArray(steps) || steps.length === 0) return steps;
+    const finalFound = Array.isArray(resultIndexes)
+        ? [...new Set(resultIndexes)]
+        : [];
+    steps.push({
+        current_indices: [],
+        current_index: -1,
+        checked_until: -1,
+        found_indices: finalFound,
+        is_match: finalFound.length > 0,
+    });
+    return steps;
+}
+
+function buildSearchSteps(data, resultIndexes, historyIndexes = []) {
     const safeData = Array.isArray(data) ? data : [];
     const safeResultIndexes = Array.isArray(resultIndexes)
         ? resultIndexes
@@ -538,13 +561,82 @@ function buildSearchSteps(data, resultIndexes) {
             .filter((idx) => Number.isInteger(idx) && idx >= 0 && idx < safeData.length)
         : [];
     const resultSet = new Set(safeResultIndexes);
+    const foundSet = new Set();
     const foundSoFar = [];
     const steps = [];
 
-    for (let idx = 0; idx < safeData.length; idx++) {
+    const rawHistory = Array.isArray(historyIndexes) ? historyIndexes : [];
+    const hasPairHistory = rawHistory.some((item) => Array.isArray(item));
+
+    if (hasPairHistory) {
+        const pairHistory = rawHistory
+            .map((item) => {
+                if (!Array.isArray(item) || item.length < 2) return null;
+                const left = Number(item[0]);
+                const right = Number(item[1]);
+                if (!Number.isInteger(left) || !Number.isInteger(right)) return null;
+                if (left < 0 || right < 0 || left >= safeData.length || right >= safeData.length) return null;
+                return [left, right];
+            })
+            .filter((item) => item !== null);
+
+        if (pairHistory.length === 0) {
+            const fallbackFound = [];
+            const fallbackSteps = Array.from({ length: safeData.length }, (_, idx) => {
+                const isMatch = resultSet.has(idx);
+                if (isMatch && !fallbackFound.includes(idx)) fallbackFound.push(idx);
+                return {
+                    current_indices: [idx],
+                    current_index: idx,
+                    checked_until: idx,
+                    found_indices: [...fallbackFound],
+                    is_match: isMatch,
+                };
+            });
+            return appendSearchFinalStep(fallbackSteps, safeResultIndexes);
+        }
+
+        for (const pair of pairHistory) {
+            const [left, right] = pair;
+            const currentIndices = left === right ? [left] : [left, right];
+            let isMatch = false;
+
+            for (const idx of currentIndices) {
+                if (resultSet.has(idx)) {
+                    isMatch = true;
+                    if (!foundSet.has(idx)) {
+                        foundSet.add(idx);
+                        foundSoFar.push(idx);
+                    }
+                }
+            }
+
+            steps.push({
+                current_indices: currentIndices,
+                current_index: currentIndices[0] ?? -1,
+                checked_until: currentIndices[currentIndices.length - 1] ?? -1,
+                found_indices: [...foundSoFar],
+                is_match: isMatch,
+            });
+        }
+        return appendSearchFinalStep(steps, safeResultIndexes);
+    }
+
+    const linearHistory = rawHistory
+        .map((idx) => Number(idx))
+        .filter((idx) => Number.isInteger(idx) && idx >= 0 && idx < safeData.length);
+    const traversal = linearHistory.length > 0
+        ? linearHistory
+        : Array.from({ length: safeData.length }, (_, idx) => idx);
+
+    for (const idx of traversal) {
         const isMatch = resultSet.has(idx);
-        if (isMatch) foundSoFar.push(idx);
+        if (isMatch && !foundSet.has(idx)) {
+            foundSet.add(idx);
+            foundSoFar.push(idx);
+        }
         steps.push({
+            current_indices: [idx],
             current_index: idx,
             checked_until: idx,
             found_indices: [...foundSoFar],
@@ -552,12 +644,13 @@ function buildSearchSteps(data, resultIndexes) {
         });
     }
 
-    return steps;
+    return appendSearchFinalStep(steps, safeResultIndexes);
 }
 
 function applySearchResult(apiResult, data, target) {
     const resultIndexes = Array.isArray(apiResult?.result) ? apiResult.result : [];
-    const steps = buildSearchSteps(data, resultIndexes);
+    const historyIndexes = Array.isArray(apiResult?.history) ? apiResult.history : [];
+    const steps = buildSearchSteps(data, resultIndexes, historyIndexes);
 
     searchData = {
         steps,
@@ -565,6 +658,7 @@ function applySearchResult(apiResult, data, target) {
         result: [...resultIndexes],
         target,
         source: apiResult?.source || 'python',
+        historySource: apiResult?.history_source || apiResult?.source || 'python',
     };
     searchPlayer.steps = steps;
     searchPlayer.current = 0;
@@ -590,7 +684,7 @@ function applySearchResult(apiResult, data, target) {
     renderSearchCells(
         searchPlot,
         searchData.initialArray,
-        firstStep.current_index,
+        firstStep.current_indices || firstStep.current_index,
         firstStep.found_indices,
         firstStep.checked_until,
         MAX_SEARCH_VISUAL_ITEMS
@@ -974,6 +1068,7 @@ function stopPlayer(player) {
 }
 
 function startPlayer(player, renderFn) {
+    if (!Array.isArray(player.steps) || player.steps.length === 0) return;
     if (player.current >= player.steps.length - 1) player.current = 0;
     player.playing = true;
     player.el.play.innerHTML = '<i data-lucide="pause"></i> <span>Пауза</span>';
@@ -981,13 +1076,22 @@ function startPlayer(player, renderFn) {
     refreshIcons();
 
     function loop() {
-        if (!player.playing || player.current >= player.steps.length - 1) {
+        if (!player.playing) {
             stopPlayer(player);
             return;
         }
-        player.current++;
+
         (player.renderFn || renderFn)(player.current);
-        player.timer = setTimeout(loop, player.speed);
+
+        if (player.current >= player.steps.length - 1) {
+            stopPlayer(player);
+            return;
+        }
+
+        player.timer = setTimeout(() => {
+            player.current++;
+            loop();
+        }, player.speed);
     }
     loop();
 }
