@@ -66,7 +66,7 @@ const SEARCH_META = {
         memory: "Память: О(1)",
     },
     linear_searche_both_sides: {
-        title: "Linear Search Both Sides",
+        title: "Bilinear",
         desc: "Проверяет элементы одновременно с начала и конца массива",
         time: "Время: O(n)",
         memory: "Память: О(1)",
@@ -255,12 +255,209 @@ function resetSortingSession() {
     if (sortPlayer.el.status) sortPlayer.el.status.textContent = '';
 }
 
+function normalizeSortingHistory(history) {
+    if (!Array.isArray(history)) return [];
+    return history
+        .filter((step) => step && typeof step === 'object' && !Array.isArray(step))
+        .map((step) => ({ ...step }));
+}
+
+function normalizePermutation(indexes, length) {
+    if (!Array.isArray(indexes) || indexes.length !== length) return [];
+    const seen = new Set();
+    const normalized = [];
+
+    for (const rawIdx of indexes) {
+        const idx = Number(rawIdx);
+        if (!Number.isInteger(idx) || idx < 0 || idx >= length || seen.has(idx)) {
+            return [];
+        }
+        seen.add(idx);
+        normalized.push(idx);
+    }
+    return normalized;
+}
+
+function toStableValueKey(value) {
+    if (typeof value === 'number' && Number.isNaN(value)) return 'number:NaN';
+    return `${typeof value}:${String(value)}`;
+}
+
+function buildPermutationForSortedArray(initialArray, sortedArray, fallbackIndexes = []) {
+    const length = Array.isArray(initialArray) ? initialArray.length : 0;
+    if (!Array.isArray(sortedArray) || sortedArray.length !== length || length === 0) {
+        const normalizedFallback = normalizePermutation(fallbackIndexes, length);
+        return normalizedFallback.length === length
+            ? normalizedFallback
+            : Array.from({ length }, (_, idx) => idx);
+    }
+
+    const valueToIndexes = new Map();
+    initialArray.forEach((value, idx) => {
+        const key = toStableValueKey(value);
+        if (!valueToIndexes.has(key)) valueToIndexes.set(key, []);
+        valueToIndexes.get(key).push(idx);
+    });
+
+    const permutation = [];
+    for (const value of sortedArray) {
+        const key = toStableValueKey(value);
+        const queue = valueToIndexes.get(key);
+        if (!queue || queue.length === 0) {
+            const normalizedFallback = normalizePermutation(fallbackIndexes, length);
+            return normalizedFallback.length === length
+                ? normalizedFallback
+                : Array.from({ length }, (_, idx) => idx);
+        }
+        permutation.push(queue.shift());
+    }
+
+    const normalizedPermutation = normalizePermutation(permutation, length);
+    if (normalizedPermutation.length === length) {
+        return normalizedPermutation;
+    }
+
+    const normalizedFallback = normalizePermutation(fallbackIndexes, length);
+    return normalizedFallback.length === length
+        ? normalizedFallback
+        : Array.from({ length }, (_, idx) => idx);
+}
+
+function buildSortedArrayFromCountingMap(numsElems) {
+    if (!numsElems || typeof numsElems !== 'object' || Array.isArray(numsElems)) return [];
+
+    const numericEntries = [];
+    const stringEntries = [];
+
+    for (const [rawValue, rawCount] of Object.entries(numsElems)) {
+        const count = Number(rawCount);
+        if (!Number.isFinite(count) || count <= 0) continue;
+
+        const numericValue = Number(rawValue);
+        if (Number.isFinite(numericValue)) {
+            numericEntries.push([numericValue, Math.trunc(count)]);
+        } else {
+            stringEntries.push([rawValue, Math.trunc(count)]);
+        }
+    }
+
+    numericEntries.sort((a, b) => a[0] - b[0]);
+    stringEntries.sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+
+    const output = [];
+    for (const [value, count] of [...numericEntries, ...stringEntries]) {
+        for (let i = 0; i < count; i++) output.push(value);
+    }
+    return output;
+}
+
+function toIndexOrMinusOne(value) {
+    const idx = Number(value);
+    return Number.isInteger(idx) ? idx : -1;
+}
+
+function pickFirstValidIndex(candidates, fallback = -1) {
+    for (const candidate of candidates) {
+        const idx = toIndexOrMinusOne(candidate);
+        if (idx >= 0) return idx;
+    }
+    return fallback;
+}
+
+function getSortingStepCompareIndexes(step) {
+    const compareA = pickFirstValidIndex([step?.compare_a, step?.curr_ind], -1);
+    const compareB = pickFirstValidIndex(
+        [step?.compare_b, step?.target_ind, step?.min_index],
+        compareA
+    );
+    return { compareA, compareB };
+}
+
+function ensureFinalSortingGreenStep(history, algo, initialArray, sortedArray) {
+    const safeHistory = normalizeSortingHistory(history);
+    const dataLength = Array.isArray(initialArray) ? initialArray.length : 0;
+
+    if (safeHistory.length === 0 || dataLength === 0) return safeHistory;
+
+    const lastStep = safeHistory[safeHistory.length - 1] || {};
+
+    if (algo === 'bogo') {
+        const hasFinalGreenStep =
+            Boolean(lastStep.is_sorted) &&
+            normalizePermutation(lastStep.indexes, dataLength).length === dataLength;
+
+        if (hasFinalGreenStep) return safeHistory;
+
+        const fallbackIndexes = normalizePermutation(lastStep.indexes, dataLength);
+        const finalIndexes = buildPermutationForSortedArray(initialArray, sortedArray, fallbackIndexes);
+        safeHistory.push({ indexes: finalIndexes, is_sorted: true });
+        return safeHistory;
+    }
+
+    if (algo === 'counting') {
+        const doneOutput = Array.isArray(lastStep.output) ? lastStep.output : [];
+        const hasFinalGreenStep =
+            String(lastStep.phase || '').toLowerCase() === 'done' &&
+            doneOutput.length >= dataLength;
+
+        if (hasFinalGreenStep) return safeHistory;
+
+        let output = [];
+        if (Array.isArray(sortedArray) && sortedArray.length === dataLength) {
+            output = [...sortedArray];
+        } else {
+            output = buildSortedArrayFromCountingMap(lastStep.nums_elems);
+        }
+
+        if (output.length === 0) return safeHistory;
+
+        safeHistory.push({
+            ...lastStep,
+            phase: 'done',
+            source_index: -1,
+            bucket_index: -1,
+            bucket_value: null,
+            bucket_count: 0,
+            write_index: -1,
+            output: [...output],
+        });
+        return safeHistory;
+    }
+
+    const sortedNum = Number.isInteger(lastStep.sorted_num) ? lastStep.sorted_num : 0;
+    if (sortedNum >= dataLength) return safeHistory;
+
+    if (algo === 'insertion') {
+        safeHistory.push({
+            compare_a: -1,
+            compare_b: -1,
+            is_swap: false,
+            sorted_num: dataLength,
+        });
+        return safeHistory;
+    }
+
+    safeHistory.push({
+        ...lastStep,
+        compare_a: -1,
+        compare_b: -1,
+        is_swap: false,
+        sorted_num: dataLength,
+    });
+    return safeHistory;
+}
+
 function applySortingResult(result, algo) {
-    sortData.history = result.history || [];
-    sortData.initialArray = result.initial_array || [];
+    sortData.initialArray = Array.isArray(result.initial_array) ? result.initial_array : [];
     sortData.sortedArray = Array.isArray(result.sorted_array)
         ? result.sorted_array
-        : [...sortData.initialArray].sort((a, b) => a - b);
+        : [];
+    sortData.history = ensureFinalSortingGreenStep(
+        result.history,
+        algo,
+        sortData.initialArray,
+        sortData.sortedArray
+    );
     sortPlayer.steps = sortData.history;
     sortPlayer.current = 0;
 
@@ -279,8 +476,7 @@ function applySortingResult(result, algo) {
 
     const direction = result.direction || meta.direction || 'end';
     const firstStep = sortData.history[0] || {};
-    const compareA = Number.isInteger(firstStep.compare_a) ? firstStep.compare_a : -1;
-    const compareB = Number.isInteger(firstStep.compare_b) ? firstStep.compare_b : -1;
+    const { compareA, compareB } = getSortingStepCompareIndexes(firstStep);
     const sortedNum = Number.isInteger(firstStep.sorted_num) ? firstStep.sorted_num : 0;
 
     renderSortingCells(
@@ -538,28 +734,63 @@ function renderSearchInputPreview() {
     renderSearchCells(searchPlot, data, -1, [], -1, MAX_SEARCH_VISUAL_ITEMS);
 }
 
-function appendSearchFinalStep(steps, resultIndexes) {
-    if (!Array.isArray(steps) || steps.length === 0) return steps;
-    const finalFound = Array.isArray(resultIndexes)
-        ? [...new Set(resultIndexes)]
+function normalizeSearchResultIndexes(resultIndexes, dataLength) {
+    if (!Array.isArray(resultIndexes)) return [];
+    return resultIndexes
+        .map((idx) => Number(idx))
+        .filter((idx) => Number.isInteger(idx) && idx >= 0 && idx < dataLength);
+}
+
+function isSameIndexOrder(left, right) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    for (let i = 0; i < left.length; i++) {
+        if (left[i] !== right[i]) return false;
+    }
+    return true;
+}
+
+function appendFinalSearchResultStep(steps, resultIndexes) {
+    const safeSteps = Array.isArray(steps) ? [...steps] : [];
+    if (!Array.isArray(resultIndexes) || resultIndexes.length === 0) return safeSteps;
+
+    const lastStep = safeSteps[safeSteps.length - 1] || {};
+    const lastCurrentIndices = Array.isArray(lastStep.current_indices)
+        ? lastStep.current_indices
+        : (
+            Number.isInteger(lastStep.current_index) && lastStep.current_index >= 0
+                ? [lastStep.current_index]
+                : []
+        );
+    const lastFoundIndices = Array.isArray(lastStep.found_indices)
+        ? lastStep.found_indices
         : [];
-    steps.push({
+
+    if (lastCurrentIndices.length === 0 && isSameIndexOrder(lastFoundIndices, resultIndexes)) {
+        return safeSteps;
+    }
+
+    const checkedUntil = Number.isInteger(lastStep.checked_until)
+        ? lastStep.checked_until
+        : (
+            lastCurrentIndices.length > 0
+                ? lastCurrentIndices[lastCurrentIndices.length - 1]
+                : -1
+        );
+
+    safeSteps.push({
         current_indices: [],
         current_index: -1,
-        checked_until: -1,
-        found_indices: finalFound,
-        is_match: finalFound.length > 0,
+        checked_until: checkedUntil,
+        found_indices: [...resultIndexes],
+        is_match: true,
     });
-    return steps;
+
+    return safeSteps;
 }
 
 function buildSearchSteps(data, resultIndexes, historyIndexes = []) {
     const safeData = Array.isArray(data) ? data : [];
-    const safeResultIndexes = Array.isArray(resultIndexes)
-        ? resultIndexes
-            .map((idx) => Number(idx))
-            .filter((idx) => Number.isInteger(idx) && idx >= 0 && idx < safeData.length)
-        : [];
+    const safeResultIndexes = normalizeSearchResultIndexes(resultIndexes, safeData.length);
     const resultSet = new Set(safeResultIndexes);
     const foundSet = new Set();
     const foundSoFar = [];
@@ -581,19 +812,7 @@ function buildSearchSteps(data, resultIndexes, historyIndexes = []) {
             .filter((item) => item !== null);
 
         if (pairHistory.length === 0) {
-            const fallbackFound = [];
-            const fallbackSteps = Array.from({ length: safeData.length }, (_, idx) => {
-                const isMatch = resultSet.has(idx);
-                if (isMatch && !fallbackFound.includes(idx)) fallbackFound.push(idx);
-                return {
-                    current_indices: [idx],
-                    current_index: idx,
-                    checked_until: idx,
-                    found_indices: [...fallbackFound],
-                    is_match: isMatch,
-                };
-            });
-            return appendSearchFinalStep(fallbackSteps, safeResultIndexes);
+            return appendFinalSearchResultStep([], safeResultIndexes);
         }
 
         for (const pair of pairHistory) {
@@ -619,15 +838,13 @@ function buildSearchSteps(data, resultIndexes, historyIndexes = []) {
                 is_match: isMatch,
             });
         }
-        return appendSearchFinalStep(steps, safeResultIndexes);
+        return appendFinalSearchResultStep(steps, safeResultIndexes);
     }
 
     const linearHistory = rawHistory
         .map((idx) => Number(idx))
         .filter((idx) => Number.isInteger(idx) && idx >= 0 && idx < safeData.length);
-    const traversal = linearHistory.length > 0
-        ? linearHistory
-        : Array.from({ length: safeData.length }, (_, idx) => idx);
+    const traversal = linearHistory;
 
     for (const idx of traversal) {
         const isMatch = resultSet.has(idx);
@@ -644,7 +861,7 @@ function buildSearchSteps(data, resultIndexes, historyIndexes = []) {
         });
     }
 
-    return appendSearchFinalStep(steps, safeResultIndexes);
+    return appendFinalSearchResultStep(steps, safeResultIndexes);
 }
 
 function applySearchResult(apiResult, data, target) {
@@ -657,8 +874,8 @@ function applySearchResult(apiResult, data, target) {
         initialArray: [...data],
         result: [...resultIndexes],
         target,
-        source: apiResult?.source || 'python',
-        historySource: apiResult?.history_source || apiResult?.source || 'python',
+        source: apiResult?.source || 'cpp',
+        historySource: apiResult?.history_source || apiResult?.source || 'cpp',
     };
     searchPlayer.steps = steps;
     searchPlayer.current = 0;
@@ -738,7 +955,10 @@ function renderSearchStep(idx) {
 
     const isLastStep = searchData.steps.length > 0 && idx >= searchData.steps.length - 1;
     if (isLastStep) {
-        setSearchResultIndexes(searchData.result);
+        const visibleResult = Array.isArray(searchData.steps[idx]?.found_indices)
+            ? searchData.steps[idx].found_indices
+            : [];
+        setSearchResultIndexes(visibleResult);
     } else {
         setSearchResultIndexes([]);
     }
@@ -845,7 +1065,7 @@ const graphSvg = document.getElementById('graph-svg');
 const graphInfo = document.getElementById('graph-info');
 
 const spacingSlider = document.getElementById('graph-spacing');
-const spacingVal   = document.getElementById('graph-spacing-val');
+const spacingVal = document.getElementById('graph-spacing-val');
 spacingSlider.addEventListener('input', () => {
     spacingVal.textContent = spacingSlider.value;
     setSpacing(Number(spacingSlider.value));
@@ -944,8 +1164,8 @@ document.getElementById('graph-run').addEventListener('click', async () => {
         return;
     }
 
-    const sinkNode = algo === 'ford_fulkerson' || algo === 'edmonds_karp' 
-        ? document.getElementById('graph-sink')?.value.trim() 
+    const sinkNode = algo === 'ford_fulkerson' || algo === 'edmonds_karp'
+        ? document.getElementById('graph-sink')?.value.trim()
         : null;
 
     if (algo === 'ford_fulkerson' || algo === 'edmonds_karp') {
@@ -964,7 +1184,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
             graphPlayer.el.status.textContent = 'Название ноды должно быть не длиннее 3 символов';
             return;
         }
-        if (algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal' || 
+        if (algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal' ||
             algo === 'ford_fulkerson' || algo === 'edmonds_karp') {
             if (parts.length >= 3) edges.push([parts[0], parts[1], parts[2]]);
         } else if (parts.length >= 2) {
@@ -985,7 +1205,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
             : algo === 'ford_fulkerson' || algo === 'edmonds_karp'
                 ? { edges, start_node: startNode, sink: sinkNode }
                 : { edges, start_node: startNode };
-                
+
         const res = await fetch(`/api/graphs/${algo}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1004,7 +1224,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
             algorithm: algo,
             nodeLabels: result.node_labels || {},
             source: result.source,
-            sink: result.sink,  
+            sink: result.sink,
         };
         graphPlayer.steps = result.steps;
         graphPlayer.current = 0;
