@@ -55,8 +55,6 @@ const SORTING_META = {
 };
 const MAX_SORT_ITEMS = 15;
 const MAX_SORT_VISUAL_ITEMS = 15;
-const MAX_SEARCH_ITEMS = 15;
-const MAX_SEARCH_VISUAL_ITEMS = 15;
 
 const SEARCH_META = {
     linear_searche: {
@@ -731,7 +729,7 @@ function renderSearchInputPreview() {
         searchPlot.innerHTML = '';
         return;
     }
-    renderSearchCells(searchPlot, data, -1, [], -1, MAX_SEARCH_VISUAL_ITEMS);
+    renderSearchCells(searchPlot, data, -1, [], -1);
 }
 
 function normalizeSearchResultIndexes(resultIndexes, dataLength) {
@@ -889,7 +887,7 @@ function applySearchResult(apiResult, data, target) {
     }
 
     if (searchData.steps.length === 0) {
-        renderSearchCells(searchPlot, searchData.initialArray, -1, [], -1, MAX_SEARCH_VISUAL_ITEMS);
+        renderSearchCells(searchPlot, searchData.initialArray, -1, [], -1);
         setSearchResultIndexes([]);
         searchPlayer.el.status.textContent = 'Совпадений нет';
         return;
@@ -903,8 +901,7 @@ function applySearchResult(apiResult, data, target) {
         searchData.initialArray,
         firstStep.current_indices || firstStep.current_index,
         firstStep.found_indices,
-        firstStep.checked_until,
-        MAX_SEARCH_VISUAL_ITEMS
+        firstStep.checked_until
     );
 
     renderSearchStep(0);
@@ -914,10 +911,6 @@ async function loadSearchData() {
     const data = parseSortInput(searchDataInput?.value || '');
     if (data.length === 0) {
         throw new Error('Введите числа через запятую');
-    }
-
-    if (data.length > MAX_SEARCH_ITEMS) {
-        throw new Error(`Можно ввести максимум ${MAX_SEARCH_ITEMS} чисел`);
     }
 
     const algo = searchAlgoSelect?.value;
@@ -948,8 +941,7 @@ function renderSearchStep(idx) {
         searchPlot,
         searchData.steps,
         searchData.initialArray,
-        idx,
-        MAX_SEARCH_VISUAL_ITEMS
+        idx
     );
     searchPlayer.el.status.textContent = msg;
 
@@ -988,21 +980,9 @@ if (searchAlgoSelect) {
 }
 
 if (searchDataInput) {
-    searchDataInput.addEventListener('input', (e) => {
-        const input = e.target;
-        const numbers = parseSortInput(input.value);
-        let isClamped = false;
-
-        if (numbers.length > MAX_SEARCH_ITEMS) {
-            input.value = numbers.slice(0, MAX_SEARCH_ITEMS).join(', ');
-            isClamped = true;
-        }
-
+    searchDataInput.addEventListener('input', () => {
         resetSearchSession();
         renderSearchInputPreview();
-        if (isClamped) {
-            searchPlayer.el.status.textContent = `Можно ввести максимум ${MAX_SEARCH_ITEMS} чисел`;
-        }
     });
 }
 

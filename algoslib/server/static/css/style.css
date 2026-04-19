@@ -404,6 +404,9 @@ select {
     border-radius: var(--radius-lg);
     background: var(--surface);
     color: var(--text);
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
 }
 
 .search-result-label {
@@ -416,6 +419,8 @@ select {
     color: var(--accent);
     font-size: 15px;
     font-weight: 700;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .counting-layout {
