@@ -55,6 +55,12 @@ const SORTING_META = {
 };
 const MAX_SORT_ITEMS = 15;
 const MAX_SORT_VISUAL_ITEMS = 15;
+const SEARCH_COLLAPSED_MAX_ROWS = 3;
+const SEARCH_COLLAPSED_ROW_HEIGHT = 50;
+const SEARCH_COLLAPSED_ROW_GAP = 8;
+const SEARCH_COLLAPSED_MAX_HEIGHT =
+    SEARCH_COLLAPSED_MAX_ROWS * SEARCH_COLLAPSED_ROW_HEIGHT +
+    (SEARCH_COLLAPSED_MAX_ROWS - 1) * SEARCH_COLLAPSED_ROW_GAP;
 
 const SEARCH_META = {
     linear_searche: {
@@ -215,6 +221,9 @@ const searchResultIndexes = document.getElementById('search-result-indexes');
 const searchDataInput = document.getElementById('search-data');
 const searchTargetInput = document.getElementById('search-target');
 const searchAlgoSelect = document.getElementById('search-algo');
+const searchArrayToggle = document.getElementById('search-array-toggle');
+let searchPlotCollapsed = true;
+let searchToggleRaf = null;
 
 function parseSortInput(raw) {
     return raw
@@ -689,6 +698,46 @@ function parseSearchTarget(raw) {
     return value;
 }
 
+function applySearchPlotCollapsedState() {
+    if (!searchPlot) return;
+
+    searchPlot.classList.toggle('search-plot-collapsed', searchPlotCollapsed);
+
+    if (!searchArrayToggle) return;
+    searchArrayToggle.classList.toggle('expanded', !searchPlotCollapsed);
+    const label = searchPlotCollapsed ? 'Развернуть массив' : 'Свернуть массив';
+    searchArrayToggle.setAttribute('aria-label', label);
+    searchArrayToggle.title = label;
+}
+
+function syncSearchArrayToggle() {
+    if (!searchPlot || !searchArrayToggle) return;
+
+    if (searchToggleRaf !== null) {
+        cancelAnimationFrame(searchToggleRaf);
+    }
+
+    searchToggleRaf = requestAnimationFrame(() => {
+        searchToggleRaf = null;
+
+        const hasCells = searchPlot.children.length > 0;
+        const hasOverflow = hasCells && searchPlot.scrollHeight > SEARCH_COLLAPSED_MAX_HEIGHT + 1;
+
+        if (!hasOverflow) {
+            searchPlotCollapsed = true;
+            searchArrayToggle.style.display = 'none';
+            searchPlot.classList.remove('search-plot-collapsed');
+            searchArrayToggle.classList.remove('expanded');
+            searchArrayToggle.setAttribute('aria-label', 'Развернуть массив');
+            searchArrayToggle.title = 'Развернуть массив';
+            return;
+        }
+
+        searchArrayToggle.style.display = 'inline-flex';
+        applySearchPlotCollapsedState();
+    });
+}
+
 function setSearchResultIndexes(indexes) {
     if (!searchResultIndexes) return;
 
@@ -709,6 +758,7 @@ function resetSearchSession() {
     stopPlayer(searchPlayer);
     searchPlayer.steps = [];
     searchPlayer.current = 0;
+    searchPlotCollapsed = true;
     searchData = {
         steps: [],
         initialArray: [],
@@ -719,6 +769,7 @@ function resetSearchSession() {
     };
     if (searchPlot) searchPlot.innerHTML = '';
     setSearchResultIndexes([]);
+    syncSearchArrayToggle();
     if (searchPlayer.el.status) searchPlayer.el.status.textContent = '';
 }
 
@@ -727,9 +778,11 @@ function renderSearchInputPreview() {
     const data = parseSortInput(searchDataInput?.value || '');
     if (data.length === 0) {
         searchPlot.innerHTML = '';
+        syncSearchArrayToggle();
         return;
     }
     renderSearchCells(searchPlot, data, -1, [], -1);
+    syncSearchArrayToggle();
 }
 
 function normalizeSearchResultIndexes(resultIndexes, dataLength) {
@@ -882,6 +935,7 @@ function applySearchResult(apiResult, data, target) {
     if (searchData.initialArray.length === 0) {
         searchPlot.innerHTML = '';
         setSearchResultIndexes([]);
+        syncSearchArrayToggle();
         searchPlayer.el.status.textContent = 'Нет данных для визуализации';
         return;
     }
@@ -889,6 +943,7 @@ function applySearchResult(apiResult, data, target) {
     if (searchData.steps.length === 0) {
         renderSearchCells(searchPlot, searchData.initialArray, -1, [], -1);
         setSearchResultIndexes([]);
+        syncSearchArrayToggle();
         searchPlayer.el.status.textContent = 'Совпадений нет';
         return;
     }
@@ -904,6 +959,7 @@ function applySearchResult(apiResult, data, target) {
         firstStep.checked_until
     );
 
+    syncSearchArrayToggle();
     renderSearchStep(0);
 }
 
@@ -944,6 +1000,7 @@ function renderSearchStep(idx) {
         idx
     );
     searchPlayer.el.status.textContent = msg;
+    syncSearchArrayToggle();
 
     const isLastStep = searchData.steps.length > 0 && idx >= searchData.steps.length - 1;
     if (isLastStep) {
@@ -992,6 +1049,17 @@ if (searchTargetInput) {
         renderSearchInputPreview();
     });
 }
+
+if (searchArrayToggle) {
+    searchArrayToggle.addEventListener('click', () => {
+        searchPlotCollapsed = !searchPlotCollapsed;
+        applySearchPlotCollapsedState();
+    });
+}
+
+window.addEventListener('resize', () => {
+    syncSearchArrayToggle();
+});
 
 searchPlayer.el.play.addEventListener('click', async () => {
     const algo = searchAlgoSelect?.value;
