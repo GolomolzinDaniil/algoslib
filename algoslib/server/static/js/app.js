@@ -700,7 +700,7 @@ function setSearchResultIndexes(indexes) {
     const value = indexes.join(', ');
     searchResultIndexes.innerHTML =
         `<div class="search-result-chip">` +
-        `<span class="search-result-label">Индексы искомого элемента:</span>` +
+        `<span class="search-result-label">Индекс искомого элемента</span>` +
         `<span class="search-result-value">${value}</span>` +
         `</div>`;
 }

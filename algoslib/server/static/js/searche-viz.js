@@ -77,7 +77,7 @@ export function updateSearchStep(
     const stepLabel = `Шаг ${Math.min(stepIndex + 1, Math.max(1, safeSteps.length))} / ${Math.max(1, safeSteps.length)}`;
     let inspectLabel = 'ожидание шага';
     if (currentIndices.length === 0 && foundIndexes.length > 0) {
-        inspectLabel = `результат: индекс(ы) ${foundIndexes.join(', ')}`;
+        inspectLabel = `результат: индекс ${foundIndexes.join(', ')}`;
     } else if (currentIndices.length === 1) {
         inspectLabel = `проверяем индекс ${currentIndices[0]} (значение ${currentValues[0]})`;
     } else if (currentIndices.length > 1) {
