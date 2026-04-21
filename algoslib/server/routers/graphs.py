@@ -37,6 +37,10 @@ class EdmondsKarpRequest(BaseModel):
     sink: str
 
 
+class StalinSortRequest(BaseModel):
+    edges: list[list[str]]
+
+
 def _normalize_label(value: str) -> str:
     label = str(value).strip()
     if not label:
@@ -228,6 +232,54 @@ async def run_bellman_ford(req: BellmanFordRequest):
                 "edge_to": int(step.edge_to),
                 "relaxed": bool(step.relaxed),
                 "distances": distances,
+            })
+
+        return {
+            "steps": result_steps,
+            "edges": parsed_edges,
+            "nodes": sorted(nodes),
+            "node_labels": node_labels,
+        }
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
+@router.post("/stalin_sort")
+async def run_stalin_sort(req: StalinSortRequest):
+    try:
+        from algoslib.graphs import Graph, stalin_sort
+
+        if stalin_sort is None:
+            raise HTTPException(
+                status_code=501,
+                detail="Stalin Sort недоступен. Пересоберите sub_graphs.",
+            )
+
+        label_to_id, node_labels = _build_label_maps_no_start(req.edges)
+        parsed_edges = _parse_unweighted_edges(req.edges, label_to_id)
+
+        graph = Graph()
+        nodes = set()
+        for u, v in parsed_edges:
+            graph.add_edge(u, v)
+            nodes.add(u)
+            nodes.add(v)
+
+        steps = stalin_sort(graph)
+
+        result_steps = []
+        for step in steps:
+            result_steps.append({
+                "current_node": int(step.current_node),
+                "accepted": bool(step.accepted),
+                "conflict_with": int(step.conflict_with),
+                "clique": [int(x) for x in step.clique],
+                "exiled": [int(x) for x in step.exiled],
             })
 
         return {

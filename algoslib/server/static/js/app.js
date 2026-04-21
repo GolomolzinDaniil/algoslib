@@ -1150,7 +1150,7 @@ document.getElementById('graph-algo').addEventListener('change', (e) => {
     }
 
     const startInput = document.getElementById('graph-start');
-    if (algo === 'kruskal') {
+    if (algo === 'kruskal' || algo === 'stalin_sort') {
         startInput.disabled = true;
         startInput.placeholder = 'Не требуется';
     } else {
@@ -1174,6 +1174,9 @@ document.getElementById('graph-example').addEventListener('click', () => {
         if (sinkInput) sinkInput.value = 'F';
     } else if (algo === 'kruskal') {
         document.getElementById('graph-edges').value = 'A B 4\nA C 2\nB C 1\nB D 5\nC D 8\nC E 10\nD E 2\nD F 6\nE F 3';
+        document.getElementById('graph-start').value = '';
+    } else if (algo === 'stalin_sort') {
+        document.getElementById('graph-edges').value = 'A B\nA C\nB C\nC D\nD E\nB E';
         document.getElementById('graph-start').value = '';
     } else {
         document.getElementById('graph-edges').value = 'A B\nA C\nB D\nC D\nD E\nE F\nC F';
@@ -1207,7 +1210,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
         return;
     }
 
-    if (!startNode && algo !== 'kruskal' && algo !== 'ford_fulkerson') {
+    if (!startNode && algo !== 'kruskal' && algo !== 'stalin_sort' && algo !== 'ford_fulkerson' && algo !== 'edmonds_karp') {
         graphPlayer.el.status.textContent = 'Введите стартовую ноду';
         return;
     }
@@ -1238,6 +1241,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
         } else if (parts.length >= 2) {
             edges.push([parts[0], parts[1]]);
         }
+
     }
 
     if (edges.length === 0) {
@@ -1248,7 +1252,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
     graphPlayer.el.status.textContent = 'Загрузка...';
 
     try {
-        const reqBody = algo === 'kruskal'
+        const reqBody = (algo === 'kruskal' || algo === 'stalin_sort')
             ? { edges }
             : algo === 'ford_fulkerson' || algo === 'edmonds_karp'
                 ? { edges, start_node: startNode, sink: sinkNode }

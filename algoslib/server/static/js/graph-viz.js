@@ -13,10 +13,13 @@ const COLORS = {
     current:     '#f44747',
     visited:     '#4ec9b0',
     queue:       '#ce9178',
+    exiled:      '#4a4a4a',
     defaultEdge: '#3e3e42',
     activeEdge:  '#f44747',
     relaxedEdge: '#4ec9b0',
+    exiledEdge:  '#2a2a2a',
     nodeText:    '#1e1e1e',
+    exiledText:  '#666666',
     distText:    '#cccccc',
     source:      '#4ec9b0',
     sink:        '#f38ba8',
@@ -55,6 +58,8 @@ export function updateGraphStep(svg, nodes, edges, step, algorithm, nodeLabels =
     let activeEdge = null;
     let relaxedEdge = null;
     let mstEdgeSet = null;
+    let exiledSet = null;
+    let cliqueSet = null;
 
     if (algorithm === 'bellman_ford') {
         activeEdge = [step.edge_from, step.edge_to];
@@ -76,9 +81,24 @@ export function updateGraphStep(svg, nodes, edges, step, algorithm, nodeLabels =
         }
     }
 
+    if (algorithm === 'stalin_sort') {
+        exiledSet = new Set(step.exiled || []);
+        cliqueSet = new Set(step.clique || []);
+    }
+
     const nodeColors = {};
     for (const n of nodes) {
-        if (algorithm === 'kruskal') {
+        if (algorithm === 'stalin_sort') {
+            if (n === current) {
+                nodeColors[n] = step.accepted ? COLORS.visited : COLORS.current;
+            } else if (cliqueSet.has(n)) {
+                nodeColors[n] = COLORS.visited;
+            } else if (exiledSet.has(n)) {
+                nodeColors[n] = COLORS.exiled;
+            } else {
+                nodeColors[n] = COLORS.defaultNode;
+            }
+        } else if (algorithm === 'kruskal') {
             if (n === step.edge_from || n === step.edge_to) {
                 nodeColors[n] = step.accepted ? COLORS.visited : COLORS.current;
             } else {
@@ -111,7 +131,9 @@ export function updateGraphStep(svg, nodes, edges, step, algorithm, nodeLabels =
         activeEdge,
         relaxedEdge,
         nodeLabels,
-        mstEdgeSet
+        mstEdgeSet,
+        exiledSet,
+        cliqueSet
     );
     return formatInfo(step, algorithm, nodeLabels);
 }
@@ -344,7 +366,7 @@ function forceLayout(nodes, edges, w, h, spacing) {
     return pos;
 }
 
-function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, relaxedEdge, nodeLabels = {}, mstEdgeSet = null) {
+function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, relaxedEdge, nodeLabels = {}, mstEdgeSet = null, exiledSet = null, cliqueSet = null) {
     let html = '';
 
     for (const edge of edges) {
@@ -355,8 +377,16 @@ function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, re
 
         let color = COLORS.defaultEdge;
         let strokeWidth = 2.5;
+        let dashAttr = '';
 
-        if (relaxedEdge && relaxedEdge[0] === u && relaxedEdge[1] === v) {
+        if (exiledSet && (exiledSet.has(u) || exiledSet.has(v))) {
+            color = COLORS.exiledEdge;
+            strokeWidth = 1.5;
+            dashAttr = ' stroke-dasharray="4 4"';
+        } else if (cliqueSet && cliqueSet.has(u) && cliqueSet.has(v)) {
+            color = COLORS.relaxedEdge;
+            strokeWidth = 3.5;
+        } else if (relaxedEdge && relaxedEdge[0] === u && relaxedEdge[1] === v) {
             color = COLORS.relaxedEdge;
             strokeWidth = 4;
         } else if (activeEdge && activeEdge[0] === u && activeEdge[1] === v) {
@@ -368,7 +398,7 @@ function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, re
         }
 
         html += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}"
-                       stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round"/>`;
+                       stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round"${dashAttr}/>`;
 
         if (weighted && edge.length >= 3) {
             const mx = (p1.x + p2.x) / 2;
@@ -385,10 +415,13 @@ function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, re
         const p = positions[n];
         if (!p) continue;
         const fill = nodeColors[n] || COLORS.defaultNode;
+        const isExiled = exiledSet && exiledSet.has(n);
+        const textFill = isExiled ? COLORS.exiledText : COLORS.nodeText;
+        const strokeColor = isExiled ? '#1a1a1a' : '#1e1e1e';
         html += `<circle cx="${p.x}" cy="${p.y}" r="${NODE_R}"
-                         fill="${fill}" stroke="#1e1e1e" stroke-width="2.5"/>`;
+                         fill="${fill}" stroke="${strokeColor}" stroke-width="2.5"/>`;
         html += `<text x="${p.x}" y="${p.y + 5}" text-anchor="middle"
-                       fill="${COLORS.nodeText}" font-size="15" font-weight="bold"
+                       fill="${textFill}" font-size="15" font-weight="bold"
                        font-family="'JetBrains Mono', monospace">${getNodeLabel(n, nodeLabels)}</text>`;
 
         if (distances && distances[String(n)] !== undefined) {
@@ -405,6 +438,28 @@ function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, re
 
 function formatInfo(step, algorithm, nodeLabels = {}) {
     const lines = [];
+
+    if (algorithm === 'stalin_sort') {
+        const currentLabel = getNodeLabel(step.current_node, nodeLabels);
+        lines.push(`<span class="label">Вершина:</span> <span class="value">${currentLabel}</span>`);
+        if (step.accepted) {
+            lines.push(`<span class="label">Решение:</span> <span class="value">Принята в клику</span>`);
+        } else {
+            const conflictLabel = step.conflict_with !== undefined && step.conflict_with !== -1
+                ? getNodeLabel(step.conflict_with, nodeLabels)
+                : '—';
+            lines.push(`<span class="label">Решение:</span> <span class="value">Сослана (нет ребра с ${conflictLabel})</span>`);
+        }
+        const cliqueLabels = (step.clique || [])
+            .map(n => getNodeLabel(n, nodeLabels))
+            .join(', ');
+        lines.push(`<span class="label">Клика:</span> <span class="value">[${cliqueLabels}]</span>`);
+        const exiledLabels = (step.exiled || [])
+            .map(n => getNodeLabel(n, nodeLabels))
+            .join(', ');
+        lines.push(`<span class="label">В ссылке:</span> <span class="value">[${exiledLabels}]</span>`);
+        return lines.join('<br>');
+    }
 
     if (algorithm === 'kruskal') {
         lines.push(

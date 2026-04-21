@@ -20,6 +20,12 @@ except ImportError:
     kruskal = None
 
 try:
+    from .sub_graphs import Stalin_Step, stalin_sort
+except ImportError:
+    Stalin_Step = None
+    stalin_sort = None
+
+try:
     from .sub_graphs import Flow_Graph, FordFulkerson_Step, FordFulkerson_Result, ford_fulkerson
     from .sub_graphs import EdmondsKarp_Step, EdmondsKarp_Result, edmonds_karp
 except ImportError:
@@ -33,6 +39,7 @@ except ImportError:
 
 __all__ = ['bfs', 'Graph', 'BFS_Step', 'Weighted_Graph', 'Dijkstra_Step', 'dijkstra',
            'Ford_Step', 'bellman_ford', 'Kruskal_Step', 'kruskal',
+           'Stalin_Step', 'stalin_sort',
            'Flow_Graph', 'FordFulkerson_Step', 'FordFulkerson_Result', 'ford_fulkerson',
            'EdmondsKarp_Step', 'EdmondsKarp_Result', 'edmonds_karp',
           ]
