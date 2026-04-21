@@ -535,6 +535,7 @@ select {
     display: flex;
     gap: 15px;
     align-items: flex-start;
+    margin-bottom: 20px;
 }
 
 .graph-main-row .input-panel {

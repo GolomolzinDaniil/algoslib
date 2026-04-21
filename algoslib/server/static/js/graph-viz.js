@@ -32,11 +32,23 @@ const NODE_R = 22;
 const W = 600;
 const H = 400;
 
+const WEIGHT_LABEL_W = 28;
+const WEIGHT_LABEL_H = 20;
+const FLOW_LABEL_W = 44;
+const FLOW_LABEL_H = 18;
+
 let positions = {};
 let currentSpacing = 5;
+let currentViewScale = 1;
 
 export function setSpacing(val) {
     currentSpacing = val;
+}
+
+export function setViewScale(val) {
+    const v = Number(val);
+    if (!Number.isFinite(v)) return;
+    currentViewScale = Math.max(0.3, Math.min(1.5, v));
 }
 
 function getNodeLabel(nodeId, nodeLabels = {}) {
@@ -45,7 +57,7 @@ function getNodeLabel(nodeId, nodeLabels = {}) {
 }
 
 export function renderGraph(svg, nodes, edges, weighted, nodeLabels = {}) {
-    positions = forceLayout(nodes, edges, W, H, currentSpacing);
+    positions = forceLayout(nodes, edges, W, H, currentSpacing, weighted);
     draw(svg, nodes, edges, weighted, {}, [], null, null, nodeLabels, null);
 }
 
@@ -140,7 +152,7 @@ export function updateGraphStep(svg, nodes, edges, step, algorithm, nodeLabels =
 
 
 export function renderFlowGraph(svg, nodes, edges, source, sink, nodeLabels = {}) {
-    positions = forceLayout(nodes, edges, W, H, currentSpacing);
+    positions = forceLayout(nodes, edges, W, H, currentSpacing, true);
     drawFlowGraph(svg, nodes, edges, source, sink, new Set(), {}, nodeLabels);
 }
 
@@ -303,7 +315,9 @@ function drawFlowGraph(svg, nodes, edges, source, sink, pathEdges, residual, nod
                        font-family="'JetBrains Mono', monospace">${label}</text>`;
     }
 
-    svg.innerHTML = html;
+    svg.innerHTML = Math.abs(currentViewScale - 1) > 0.001
+        ? `<g transform="scale(${currentViewScale})">${html}</g>`
+        : html;
 }
 
 function formatFlowInfo(step, source, sink, nodeLabels = {}) {
@@ -321,8 +335,11 @@ function formatFlowInfo(step, source, sink, nodeLabels = {}) {
     
     return lines.join('<br>');
 }
-function forceLayout(nodes, edges, w, h, spacing) {
+function forceLayout(nodes, edges, w, h, spacing, weighted = false) {
     const s = (spacing || 5) / 5;
+    const scale = currentViewScale;
+    const vw = w / scale;
+    const vh = h / scale;
     const pad = NODE_R + 20;
 
     const simNodes = nodes.map((id) => ({ id }));
@@ -340,30 +357,191 @@ function forceLayout(nodes, edges, w, h, spacing) {
         }
     }
 
-    const baseDist = Math.max(60, Math.min(140, 600 / nodes.length));
+    const weightFactor = weighted ? 1.35 : 1.0;
+    const baseDist = Math.max(60, Math.min(140, 600 / nodes.length)) * weightFactor;
     const linkDist = baseDist * s;
-    const charge = -250 * s;
-    const collide = (NODE_R + 8) * s;
+    const charge = -250 * s * (weighted ? 1.25 : 1);
+    const collide = (NODE_R + (weighted ? 16 : 8)) * s;
 
     const sim = forceSimulation(simNodes)
         .force('charge', forceManyBody().strength(charge))
         .force('link', forceLink(simLinks).distance(linkDist).strength(1))
-        .force('center', forceCenter(w / 2, h / 2))
+        .force('center', forceCenter(vw / 2, vh / 2))
         .force('collide', forceCollide(collide))
-        .force('x', forceX(w / 2).strength(0.05))
-        .force('y', forceY(h / 2).strength(0.05))
-        .stop();
+        .force('x', forceX(vw / 2).strength(0.05))
+        .force('y', forceY(vh / 2).strength(0.05));
 
-    for (let i = 0; i < 300; i++) sim.tick();
+    if (weighted && simLinks.length > 1) {
+        const labelDiag = Math.hypot(WEIGHT_LABEL_W, WEIGHT_LABEL_H);
+        const midMinDist = labelDiag + 8;
+        sim.force('midRepel', (alpha) => {
+            const mids = new Array(simLinks.length);
+            for (let i = 0; i < simLinks.length; i++) {
+                const lk = simLinks[i];
+                mids[i] = {
+                    link: lk,
+                    x: (lk.source.x + lk.target.x) / 2,
+                    y: (lk.source.y + lk.target.y) / 2,
+                };
+            }
+            for (let i = 0; i < mids.length; i++) {
+                for (let j = i + 1; j < mids.length; j++) {
+                    const a = mids[i];
+                    const b = mids[j];
+                    let dx = b.x - a.x;
+                    let dy = b.y - a.y;
+                    let dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 0.01) {
+                        dx = (Math.random() - 0.5) * 0.1;
+                        dy = (Math.random() - 0.5) * 0.1;
+                        dist = Math.sqrt(dx * dx + dy * dy) || 0.01;
+                    }
+                    if (dist < midMinDist) {
+                        const push = ((midMinDist - dist) / dist) * alpha * 0.35;
+                        const fx = dx * push;
+                        const fy = dy * push;
+                        a.link.source.vx -= fx * 0.5;
+                        a.link.source.vy -= fy * 0.5;
+                        a.link.target.vx -= fx * 0.5;
+                        a.link.target.vy -= fy * 0.5;
+                        b.link.source.vx += fx * 0.5;
+                        b.link.source.vy += fy * 0.5;
+                        b.link.target.vx += fx * 0.5;
+                        b.link.target.vy += fy * 0.5;
+                    }
+                }
+            }
+        });
+    }
+
+    sim.stop();
+    const iterations = weighted ? 400 : 300;
+    for (let i = 0; i < iterations; i++) sim.tick();
 
     const pos = {};
     for (const n of simNodes) {
         pos[n.id] = {
-            x: Math.max(pad, Math.min(w - pad, n.x)),
-            y: Math.max(pad, Math.min(h - pad, n.y)),
+            x: Math.max(pad, Math.min(vw - pad, n.x)),
+            y: Math.max(pad, Math.min(vh - pad, n.y)),
         };
     }
     return pos;
+}
+
+function buildWeightedLabelPlacements(edges, labelW, labelH) {
+    const out = [];
+    for (let i = 0; i < edges.length; i++) {
+        const edge = edges[i];
+        if (!edge || edge.length < 3) continue;
+        const p1 = positions[edge[0]];
+        const p2 = positions[edge[1]];
+        if (!p1 || !p2) continue;
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const tx = dx / len;
+        const ty = dy / len;
+        const bx = (p1.x + p2.x) / 2;
+        const by = (p1.y + p2.y) / 2;
+        out.push({
+            edgeIdx: i,
+            text: String(edge[2]),
+            bx, by,
+            x: bx, y: by,
+            tx, ty,
+            nx: -ty, ny: tx,
+            len,
+            w: labelW,
+            h: labelH,
+        });
+    }
+    return out;
+}
+
+function resolveLabelPlacements(placements, nodeObstacles, bounds) {
+    const MARGIN = 3;
+    const MAX_NORMAL = 28;
+    const MAX_TANGENT_FRAC = 0.32;
+    const ITERS = 60;
+
+    for (let iter = 0; iter < ITERS; iter++) {
+        let moved = false;
+
+        for (let i = 0; i < placements.length; i++) {
+            for (let j = i + 1; j < placements.length; j++) {
+                const a = placements[i];
+                const b = placements[j];
+                const dx = b.x - a.x;
+                const dy = b.y - a.y;
+                const minDX = (a.w + b.w) / 2 + MARGIN;
+                const minDY = (a.h + b.h) / 2 + MARGIN;
+                const oX = minDX - Math.abs(dx);
+                const oY = minDY - Math.abs(dy);
+                if (oX > 0 && oY > 0) {
+                    moved = true;
+                    let px = 0;
+                    let py = 0;
+                    if (oX < oY) {
+                        const s = dx === 0 ? (Math.random() < 0.5 ? -1 : 1) : Math.sign(dx);
+                        px = s * (oX / 2 + 0.25);
+                    } else {
+                        const s = dy === 0 ? (Math.random() < 0.5 ? -1 : 1) : Math.sign(dy);
+                        py = s * (oY / 2 + 0.25);
+                    }
+                    a.x -= px; a.y -= py;
+                    b.x += px; b.y += py;
+                }
+            }
+        }
+
+        for (const p of placements) {
+            for (const node of nodeObstacles) {
+                const halfW = p.w / 2 + 1;
+                const halfH = p.h / 2 + 1;
+                const nearestX = Math.max(p.x - halfW, Math.min(node.x, p.x + halfW));
+                const nearestY = Math.max(p.y - halfH, Math.min(node.y, p.y + halfH));
+                const dx = nearestX - node.x;
+                const dy = nearestY - node.y;
+                const d2 = dx * dx + dy * dy;
+                const minD = node.r + 2;
+                if (d2 < minD * minD) {
+                    moved = true;
+                    const d = Math.sqrt(d2) || 0.01;
+                    const push = (minD - d) / d;
+                    p.x += dx * push * 0.7;
+                    p.y += dy * push * 0.7;
+                }
+            }
+        }
+
+        for (const p of placements) {
+            const offX = p.x - p.bx;
+            const offY = p.y - p.by;
+            let tan = offX * p.tx + offY * p.ty;
+            let nrm = offX * p.nx + offY * p.ny;
+            const maxTan = p.len * MAX_TANGENT_FRAC;
+            if (tan > maxTan) tan = maxTan;
+            else if (tan < -maxTan) tan = -maxTan;
+            if (nrm > MAX_NORMAL) nrm = MAX_NORMAL;
+            else if (nrm < -MAX_NORMAL) nrm = -MAX_NORMAL;
+            p.x = p.bx + tan * p.tx + nrm * p.nx;
+            p.y = p.by + tan * p.ty + nrm * p.ny;
+        }
+
+        if (bounds) {
+            for (const p of placements) {
+                const hw = p.w / 2;
+                const hh = p.h / 2;
+                if (p.x < bounds.minX + hw) p.x = bounds.minX + hw;
+                else if (p.x > bounds.maxX - hw) p.x = bounds.maxX - hw;
+                if (p.y < bounds.minY + hh) p.y = bounds.minY + hh;
+                else if (p.y > bounds.maxY - hh) p.y = bounds.maxY - hh;
+            }
+        }
+
+        if (!moved) break;
+    }
+    return placements;
 }
 
 function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, relaxedEdge, nodeLabels = {}, mstEdgeSet = null, exiledSet = null, cliqueSet = null) {
@@ -399,15 +577,30 @@ function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, re
 
         html += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}"
                        stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round"${dashAttr}/>`;
+    }
 
-        if (weighted && edge.length >= 3) {
-            const mx = (p1.x + p2.x) / 2;
-            const my = (p1.y + p2.y) / 2;
-            html += `<rect x="${mx - 14}" y="${my - 10}" width="28" height="20" rx="4"
+    if (weighted) {
+        const placements = buildWeightedLabelPlacements(edges, WEIGHT_LABEL_W, WEIGHT_LABEL_H);
+        const nodeObstacles = [];
+        for (const n of nodes) {
+            const p = positions[n];
+            if (p) nodeObstacles.push({ x: p.x, y: p.y, r: NODE_R });
+        }
+        const scale = currentViewScale;
+        resolveLabelPlacements(placements, nodeObstacles, { minX: 0, minY: 0, maxX: W / scale, maxY: H / scale });
+
+        for (const p of placements) {
+            const ddx = p.x - p.bx;
+            const ddy = p.y - p.by;
+            if (ddx * ddx + ddy * ddy > 9) {
+                html += `<line x1="${p.bx}" y1="${p.by}" x2="${p.x}" y2="${p.y}"
+                               stroke="#5a5a5a" stroke-width="1" stroke-dasharray="2,2" opacity="0.75"/>`;
+            }
+            html += `<rect x="${p.x - p.w / 2}" y="${p.y - p.h / 2}" width="${p.w}" height="${p.h}" rx="4"
                            fill="#252526" stroke="#3e3e42" stroke-width="1"/>`;
-            html += `<text x="${mx}" y="${my + 5}" text-anchor="middle"
+            html += `<text x="${p.x}" y="${p.y + 5}" text-anchor="middle"
                            fill="${COLORS.distText}" font-size="12"
-                           font-family="'JetBrains Mono', monospace">${edge[2]}</text>`;
+                           font-family="'JetBrains Mono', monospace">${p.text}</text>`;
         }
     }
 
@@ -433,7 +626,9 @@ function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, re
         }
     }
 
-    svg.innerHTML = html;
+    svg.innerHTML = Math.abs(currentViewScale - 1) > 0.001
+        ? `<g transform="scale(${currentViewScale})">${html}</g>`
+        : html;
 }
 
 function formatInfo(step, algorithm, nodeLabels = {}) {

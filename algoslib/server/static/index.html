@@ -125,7 +125,7 @@ D E</textarea>
                     <label>Начальная вершина:</label>
                     <input type="text" id="graph-start" value="A" placeholder="A" maxlength="3">
                 </div>
-                <div id="sink-field" style="display: none;">
+                <div id="sink-field" class="input-row" style="display: none;">
                     <label for="graph-sink">Сток (sink):</label>
                     <input type="text" id="graph-sink" value="F" placeholder="F" maxlength="3">
                 </div>
@@ -141,8 +141,13 @@ D E</textarea>
                 </div>
                 <div class="graph-spacing-control">
                     <span>Разреженность:</span>
-                    <input type="range" id="graph-spacing" min="1" max="10" value="5" step="1">
+                    <input type="range" id="graph-spacing" min="1" max="25" value="5" step="1">
                     <span id="graph-spacing-val">5</span>
+                </div>
+                <div class="graph-spacing-control">
+                    <span>Масштаб:</span>
+                    <input type="range" id="graph-scale" min="40" max="150" value="100" step="5">
+                    <span id="graph-scale-val">100</span>
                 </div>
             </div>
 
