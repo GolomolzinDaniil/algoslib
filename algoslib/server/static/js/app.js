@@ -1,5 +1,5 @@
 import { renderSortingCells, updateSortingStep } from './sorting-viz.js';
-import { renderGraph, updateGraphStep, setSpacing, renderFlowGraph, updateFlowGraphStep, updateTarjanStep, updateKosarajuStep} from './graph-viz.js';
+import { renderGraph, updateGraphStep, setSpacing, setViewScale, renderFlowGraph, updateFlowGraphStep, updateTarjanStep, updateKosarajuStep } from './graph-viz.js';
 import { renderSearchCells, updateSearchStep } from './searche-viz.js';
 
 const SORTING_META = {
@@ -1114,21 +1114,70 @@ const graphInfo = document.getElementById('graph-info');
 
 const spacingSlider = document.getElementById('graph-spacing');
 const spacingVal = document.getElementById('graph-spacing-val');
+const scaleSlider = document.getElementById('graph-scale');
+const scaleVal = document.getElementById('graph-scale-val');
+
+function rerenderCurrentGraph() {
+    if (!graphData) return;
+    const algo = graphData.algorithm;
+    if (algo === 'ford_fulkerson' || algo === 'edmonds_karp') {
+        renderFlowGraph(graphSvg, graphData.nodes, graphData.edges, graphData.source, graphData.sink, graphData.nodeLabels);
+        if (graphPlayer.steps.length) renderFlowStepAt(graphPlayer.current);
+    } else {
+        const weighted = algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal';
+        renderGraph(graphSvg, graphData.nodes, graphData.edges, weighted, graphData.nodeLabels);
+        if (graphPlayer.steps.length) renderGraphStepAt(graphPlayer.current);
+    }
+}
+
 spacingSlider.addEventListener('input', () => {
     spacingVal.textContent = spacingSlider.value;
     setSpacing(Number(spacingSlider.value));
-    if (graphData) {
-        const algo = graphData.algorithm;
-        if (algo === 'ford_fulkerson' || algo === 'edmonds_karp') {
-            renderFlowGraph(graphSvg, graphData.nodes, graphData.edges, graphData.source, graphData.sink);
-            if (graphPlayer.steps.length) renderFlowStepAt(graphPlayer.current);
-        } else {
-            const weighted = algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal';
-            renderGraph(graphSvg, graphData.nodes, graphData.edges, weighted, graphData.nodeLabels);
-            if (graphPlayer.steps.length) renderGraphStepAt(graphPlayer.current);
-        }
-    }
+    rerenderCurrentGraph();
 });
+
+scaleSlider.addEventListener('input', () => {
+    scaleVal.textContent = scaleSlider.value;
+    setViewScale(Number(scaleSlider.value) / 100);
+    rerenderCurrentGraph();
+});
+
+function graphSize(nodes, edges) {
+    const n = Array.isArray(nodes) ? nodes.length : 0;
+    const e = Array.isArray(edges) ? edges.length : 0;
+    return { n, e, score: n + e * 0.65 };
+}
+
+function computeAutoSpacing(nodes, edges) {
+    const { n, e } = graphSize(nodes, edges);
+    if (n === 0) return 5;
+    const raw = 5 + Math.max(0, n - 5) * 0.3 + Math.max(0, e - n) * 0.2;
+    const min = Number(spacingSlider.min) || 1;
+    const max = Number(spacingSlider.max) || 25;
+    return Math.round(Math.max(min, Math.min(max, raw)));
+}
+
+function computeAutoViewScalePct(nodes, edges) {
+    const { score } = graphSize(nodes, edges);
+    if (score <= 9) return 100;
+    const raw = 100 * Math.cbrt(9 / score);
+    const min = Number(scaleSlider.min) || 40;
+    const max = Number(scaleSlider.max) || 150;
+    const pct = Math.max(min, Math.min(max, raw));
+    return Math.round(pct / 5) * 5;
+}
+
+function applyAutoSpacing(nodes, edges) {
+    const spacingValue = computeAutoSpacing(nodes, edges);
+    spacingSlider.value = String(spacingValue);
+    spacingVal.textContent = String(spacingValue);
+    setSpacing(spacingValue);
+
+    const scalePct = computeAutoViewScalePct(nodes, edges);
+    scaleSlider.value = String(scalePct);
+    scaleVal.textContent = String(scalePct);
+    setViewScale(scalePct / 100);
+}
 
 document.getElementById('graph-algo').addEventListener('change', (e) => {
     const label = document.getElementById('edges-label');
@@ -1291,6 +1340,9 @@ document.getElementById('graph-run').addEventListener('click', async () => {
 
         graphPlayer.el.controls.style.display = 'flex';
         graphInfo.style.display = 'block';
+
+        applyAutoSpacing(graphData.nodes, graphData.edges);
+
         if (algo === 'ford_fulkerson' || algo === 'edmonds_karp') {
             graphPlayer.renderFn = renderFlowStepAt;
             renderFlowGraph(graphSvg, graphData.nodes, graphData.edges, graphData.source, graphData.sink, graphData.nodeLabels);
