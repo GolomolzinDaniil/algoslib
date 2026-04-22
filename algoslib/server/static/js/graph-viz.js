@@ -555,7 +555,7 @@ function resolveLabelPlacements(placements, nodeObstacles, bounds) {
     return placements;
 }
 
-function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, relaxedEdge, nodeLabels = {}, mstEdgeSet = null, exiledSet = null, cliqueSet = null) {
+function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, relaxedEdge, nodeLabels = {}, mstEdgeSet = null, exiledSet = null, cliqueSet = null, edgeColorOverride = null) {
     let html = '';
 
     for (const edge of edges) {
@@ -568,7 +568,10 @@ function draw(svg, nodes, edges, weighted, nodeColors, distances, activeEdge, re
         let strokeWidth = 2.5;
         let dashAttr = '';
 
-        if (exiledSet && (exiledSet.has(u) || exiledSet.has(v))) {
+        if (edgeColorOverride && activeEdge && activeEdge[0] === u && activeEdge[1] === v) {
+            color = edgeColorOverride;
+            strokeWidth = 4;
+        } else if (exiledSet && (exiledSet.has(u) || exiledSet.has(v))) {
             color = COLORS.exiledEdge;
             strokeWidth = 1.5;
             dashAttr = ' stroke-dasharray="4 4"';
@@ -745,7 +748,7 @@ export function updateTarjanStep(svg, nodes, edges, step, nodeLabels = {}) {
         }
     }
 
-    draw(svg, nodes, edges, false, nodeColors, {}, activeEdge, null, nodeLabels, null, edgeColor);
+    draw(svg, nodes, edges, false, nodeColors, {}, activeEdge, null, nodeLabels, null, null, null, edgeColor);
 
     const lines = [];
     const actionLabels = { 'visit': 'Посещение', 'explore_edge': 'Исследование ребра', 'update_lowlink': 'Обновление lowlink', 'found_scc': 'Найдена SCC!', 'done': 'Завершено' };
@@ -836,6 +839,8 @@ export function updateKosarajuStep(svg, nodes, edges, step, nodeLabels = {}) {
         activeEdge,
         null,
         nodeLabels,
+        null,
+        null,
         null,
         edgeColor,
     );
