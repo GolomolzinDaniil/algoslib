@@ -36,6 +36,12 @@ class EdmondsKarpRequest(BaseModel):
     start_node: str
     sink: str
 
+class TarjanRequest(BaseModel):
+    edges: list[list[str]] 
+
+class KosarajuRequest(BaseModel):
+    edges: list[list[str]]
+
 
 class StalinSortRequest(BaseModel):
     edges: list[list[str]]
@@ -502,3 +508,118 @@ async def run_edmonds_karp(req: EdmondsKarpRequest):
             status_code=500,
             content={"detail": str(e), "error_type": type(e).__name__}
         )
+    
+@router.post("/tarjan")
+async def run_tarjan(req: TarjanRequest):
+    try:
+        # Импортируем OrientedGraph и функцию алгоритма
+        from algoslib.graphs import OrientedGraph, tarjan_scc
+
+        if tarjan_scc is None:
+            raise HTTPException(status_code=501, detail="Tarjan SCC недоступен. Пересоберите sub_graphs.")
+
+        # Парсим рёбра и маппинг меток
+        label_to_id, node_labels = _build_label_maps_no_start(req.edges)
+        parsed_edges = _parse_unweighted_edges(req.edges, label_to_id)
+
+        # Создаем ориентированный граф
+        graph = OrientedGraph()
+        
+        # ВАЖНО: Собираем уникальные вершины из списка рёбер, а не из graph.adjacency_list
+        nodes = set()
+        for u, v in parsed_edges:
+            graph.add_edge(u, v)  # Добавляем направленное ребро u -> v
+            nodes.add(u)
+            nodes.add(v)
+
+        # Запускаем алгоритм
+        steps = tarjan_scc(graph)
+
+        # Формируем ответ
+        result_steps = []
+        for step in steps:
+            result_steps.append({
+                "current_node": int(step.current_node) if step.current_node != -1 else None,
+                "stack": [int(x) for x in step.stack],
+                "index_map": {str(k): int(v) for k, v in step.index_map.items()},
+                "lowlink_map": {str(k): int(v) for k, v in step.lowlink_map.items()},
+                "on_stack_nodes": [int(x) for x in step.on_stack_nodes],
+                "edge_from": int(step.edge_from) if step.edge_from != -1 else None,
+                "edge_to": int(step.edge_to) if step.edge_to != -1 else None,
+                "edge_type": step.edge_type,
+                "completed_sccs": [[int(x) for x in scc] for scc in step.completed_sccs],
+                "current_scc": [int(x) for x in step.current_scc],
+                "action": step.action,
+                "index_counter": int(step.index_counter),
+            })
+
+        return {
+            "steps": result_steps,
+            "edges": parsed_edges,
+            "nodes": sorted(nodes),  # Вершины берутся из набора nodes, который мы собрали вручную
+            "node_labels": node_labels,
+            "algorithm": "tarjan",
+        }
+        
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+    
+    
+@router.post("/kosaraju")
+async def run_kosaraju(req: KosarajuRequest):
+    try:
+        from algoslib.graphs import OrientedGraph, kosaraju_scc
+
+        if kosaraju_scc is None:
+            raise HTTPException(status_code=501, detail="Kosaraju недоступен. Пересоберите sub_graphs.")
+
+        label_to_id, node_labels = _build_label_maps_no_start(req.edges)
+        parsed_edges = _parse_unweighted_edges(req.edges, label_to_id)
+
+        graph = OrientedGraph()
+        nodes = set()
+        for u, v in parsed_edges:
+            graph.add_edge(u, v)  # Направленное ребро
+            nodes.add(u)
+            nodes.add(v)
+
+        steps = kosaraju_scc(graph)
+
+        result_steps = []
+        for step in steps:
+            result_steps.append({
+                "phase": int(step.phase),
+                "current_node": int(step.current_node) if step.current_node != -1 else None,
+                "stack": [int(x) for x in step.stack],
+                "finish_order": [int(x) for x in step.finish_order],
+                "processing_order": [int(x) for x in step.processing_order],
+                "edge_from": int(step.edge_from) if step.edge_from != -1 else None,
+                "edge_to": int(step.edge_to) if step.edge_to != -1 else None,
+                "completed_sccs": [[int(x) for x in scc] for scc in step.completed_sccs],
+                "current_scc": [int(x) for x in step.current_scc],
+                "action": step.action,
+                "is_transposed_edge": bool(step.is_transposed_edge),
+            })
+
+        return {
+            "steps": result_steps,
+            "edges": parsed_edges,
+            "nodes": sorted(nodes),
+            "node_labels": node_labels,
+            "algorithm": "kosaraju",
+        }
+        
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})

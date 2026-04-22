@@ -1,5 +1,5 @@
 import { renderSortingCells, updateSortingStep } from './sorting-viz.js';
-import { renderGraph, updateGraphStep, setSpacing, setViewScale, renderFlowGraph, updateFlowGraphStep } from './graph-viz.js';
+import { renderGraph, updateGraphStep, setSpacing, setViewScale, renderFlowGraph, updateFlowGraphStep, updateTarjanStep, updateKosarajuStep } from './graph-viz.js';
 import { renderSearchCells, updateSearchStep } from './searche-viz.js';
 
 const SORTING_META = {
@@ -1191,15 +1191,19 @@ document.getElementById('graph-algo').addEventListener('change', (e) => {
     } else if (algo === 'ford_fulkerson' || algo === 'edmonds_karp') {
         label.textContent = 'Рёбра (A B пропускная_способность):';
         if (sourceLabel) sourceLabel.textContent = 'Источник (source):';
-        if (sinkField) sinkField.style.display = '';
+        if (sinkField) sinkField.style.display = 'block';
+    } else if (algo === 'tarjan' || algo === 'kosaraju') {  
+        label.textContent = 'Рёбра ориентированного графа (A B):';
+        if (sourceLabel) sourceLabel.textContent = 'Не требуется:';
+        if (sinkField) sinkField.style.display = 'none';
     } else {
         label.textContent = 'Рёбра (по одному на строке: A B):';
         if (sourceLabel) sourceLabel.textContent = 'Начальная вершина:';
         if (sinkField) sinkField.style.display = 'none';
     }
-
+    
     const startInput = document.getElementById('graph-start');
-    if (algo === 'kruskal' || algo === 'stalin_sort') {
+    if (algo === 'kruskal' || algo === 'tarjan' || algo === 'kosaraju' || algo === 'stalin_sort') { 
         startInput.disabled = true;
         startInput.placeholder = 'Не требуется';
     } else {
@@ -1224,6 +1228,9 @@ document.getElementById('graph-example').addEventListener('click', () => {
     } else if (algo === 'kruskal') {
         document.getElementById('graph-edges').value = 'A B 4\nA C 2\nB C 1\nB D 5\nC D 8\nC E 10\nD E 2\nD F 6\nE F 3';
         document.getElementById('graph-start').value = '';
+    } else if (algo === 'tarjan' || algo === 'kosaraju') { 
+    document.getElementById('graph-edges').value = 'A B\nB C\nC A\nC D\nD E\nE D\nF C';
+    document.getElementById('graph-start').value = '';
     } else if (algo === 'stalin_sort') {
         document.getElementById('graph-edges').value = 'A B\nA C\nB C\nC D\nD E\nB E';
         document.getElementById('graph-start').value = '';
@@ -1259,7 +1266,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
         return;
     }
 
-    if (!startNode && algo !== 'kruskal' && algo !== 'stalin_sort' && algo !== 'ford_fulkerson' && algo !== 'edmonds_karp') {
+    if (!startNode && algo !== 'kruskal' && algo !== 'ford_fulkerson' && algo !== 'tarjan' && algo !== 'kosaraju' && algo !== 'stalin_sort') {
         graphPlayer.el.status.textContent = 'Введите стартовую ноду';
         return;
     }
@@ -1301,7 +1308,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
     graphPlayer.el.status.textContent = 'Загрузка...';
 
     try {
-        const reqBody = (algo === 'kruskal' || algo === 'stalin_sort')
+        const reqBody = (algo === 'kruskal' || algo === 'tarjan' || algo === 'kosaraju' || algo === 'stalin_sort')
             ? { edges }
             : algo === 'ford_fulkerson' || algo === 'edmonds_karp'
                 ? { edges, start_node: startNode, sink: sinkNode }
@@ -1340,6 +1347,11 @@ document.getElementById('graph-run').addEventListener('click', async () => {
             graphPlayer.renderFn = renderFlowStepAt;
             renderFlowGraph(graphSvg, graphData.nodes, graphData.edges, graphData.source, graphData.sink, graphData.nodeLabels);
             renderFlowStepAt(0);
+        } else if (algo === 'tarjan' || algo === 'kosaraju') { 
+            graphPlayer.renderFn = algo === 'tarjan' ? renderTarjanStepAt : renderKosarajuStepAt;
+            renderGraph(graphSvg, graphData.nodes, graphData.edges, false, graphData.nodeLabels);
+            if (algo === 'tarjan') renderTarjanStepAt(0);
+            else renderKosarajuStepAt(0);
         } else {
             graphPlayer.renderFn = renderGraphStepAt;
             const weighted = algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal';
@@ -1377,6 +1389,32 @@ function renderFlowStepAt(idx) {
     );
     graphInfo.innerHTML = info;
     graphPlayer.el.status.textContent = `Итерация ${step.iteration} / ${graphPlayer.steps.length}`;
+}
+
+function renderTarjanStepAt(idx) {
+    const step = graphPlayer.steps[idx];
+    const info = updateTarjanStep(  
+        graphSvg,
+        graphData.nodes,
+        graphData.edges,
+        step,
+        graphData.nodeLabels
+    );
+    graphInfo.innerHTML = info;
+    graphPlayer.el.status.textContent = `Шаг ${idx + 1} / ${graphPlayer.steps.length}`;
+}
+
+function renderKosarajuStepAt(idx) {
+    const step = graphPlayer.steps[idx];
+    const info = updateKosarajuStep(
+        graphSvg,
+        graphData.nodes,
+        graphData.edges,
+        step,
+        graphData.nodeLabels
+    );
+    graphInfo.innerHTML = info;
+    graphPlayer.el.status.textContent = `Фаза ${step.phase}, шаг ${idx + 1} / ${graphPlayer.steps.length}`;
 }
 
 function refreshIcons() {
@@ -1448,12 +1486,3 @@ function wireControls(player, renderFn) {
 }
 
 wireControls(graphPlayer, renderGraphStepAt);
-
-graphPlayer.el.play.addEventListener('click', () => {
-    if (graphPlayer.steps.length === 0) return;
-    if (graphPlayer.playing) {
-        stopPlayer(graphPlayer);
-    } else {
-        startPlayer(graphPlayer, graphPlayer.renderFn || renderGraphStepAt);
-    }
-});

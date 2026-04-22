@@ -464,4 +464,183 @@ def test_ford_fulkerson_step_type():
     
     assert all(isinstance(s, FordFulkerson_Step) for s in result.history)
 
+def test_oriented_graph_creation():
+    g = OrientedGraph()
+    assert isinstance(g, OrientedGraph)
 
+def test_oriented_graph_directed_edges():
+    """Проверка, что рёбра добавляются строго в одном направлении."""
+    g = OrientedGraph()
+    g.add_edge(0, 1)
+    
+    # 0 -> 1 существует
+    neighbors_0 = g.get_neighbors(0)
+    assert 1 in neighbors_0
+    
+    # 1 -> 0 НЕ существует
+    neighbors_1 = g.get_neighbors(1)
+    assert 0 not in neighbors_1
+
+
+def test_tarjan_simple_cycle():
+    """Простой цикл: 0 -> 1 -> 2 -> 0 (одна SCC)"""
+    g = OrientedGraph()
+    g.add_edge(0, 1)
+    g.add_edge(1, 2)
+    g.add_edge(2, 0)
+
+    steps = tarjan_scc(g)
+    final_sccs = steps[-1].completed_sccs
+    
+    assert len(final_sccs) == 1
+    assert set(final_sccs[0]) == {0, 1, 2}
+
+
+def test_tarjan_multiple_sccs():
+    """Граф с двумя SCC и мостом между ними"""
+    g = OrientedGraph()
+    # SCC 1
+    g.add_edge(0, 1)
+    g.add_edge(1, 2)
+    g.add_edge(2, 0)
+    # Мост
+    g.add_edge(2, 3)
+    # SCC 2
+    g.add_edge(3, 4)
+    g.add_edge(4, 3)
+
+    steps = tarjan_scc(g)
+    final_sccs = steps[-1].completed_sccs
+    
+    assert len(final_sccs) == 2
+    scc_sets = [frozenset(scc) for scc in final_sccs]
+    assert frozenset({0, 1, 2}) in scc_sets
+    assert frozenset({3, 4}) in scc_sets
+
+
+def test_tarjan_step_type():
+    g = OrientedGraph()
+    g.add_edge(0, 1)
+    steps = tarjan_scc(g)
+    assert all(isinstance(s, Tarjan_Step) for s in steps)
+
+
+def test_tarjan_dag_each_node_is_scc():
+    """Ориентированный ациклический граф: каждая вершина — отдельная SCC"""
+    g = OrientedGraph()
+    g.add_edge(0, 1)
+    g.add_edge(1, 2)
+    g.add_edge(2, 3)
+
+    steps = tarjan_scc(g)
+    final_sccs = steps[-1].completed_sccs
+    
+    assert len(final_sccs) == 4
+    for i in range(4):
+        assert any(frozenset({i}) == frozenset(scc) for scc in final_sccs)
+
+
+def test_tarjan_disconnected():
+    """Две несвязанные компоненты связности"""
+    g = OrientedGraph()
+    g.add_edge(0, 1)
+    g.add_edge(1, 0)
+    g.add_edge(2, 3)
+    g.add_edge(3, 2)
+
+    steps = tarjan_scc(g)
+    final_sccs = steps[-1].completed_sccs
+    assert len(final_sccs) == 2
+
+
+def test_tarjan_empty_graph():
+    """Пустой граф не должен вызывать ошибок"""
+    g = OrientedGraph()
+    steps = tarjan_scc(g)
+    assert len(steps) == 0
+
+
+
+def test_kosaraju_simple_cycle():
+    g = OrientedGraph()
+    g.add_edge(0, 1)
+    g.add_edge(1, 2)
+    g.add_edge(2, 0)
+
+    steps = kosaraju_scc(g)
+    final_sccs = steps[-1].completed_sccs
+    
+    assert len(final_sccs) == 1
+    assert set(final_sccs[0]) == {0, 1, 2}
+
+
+def test_kosaraju_multiple_sccs():
+    g = OrientedGraph()
+    g.add_edge(0, 1)
+    g.add_edge(1, 2)
+    g.add_edge(2, 0)
+    g.add_edge(2, 3)
+    g.add_edge(3, 4)
+    g.add_edge(4, 3)
+
+    steps = kosaraju_scc(g)
+    final_sccs = steps[-1].completed_sccs
+    
+    assert len(final_sccs) == 2
+    scc_sets = [frozenset(scc) for scc in final_sccs]
+    assert frozenset({0, 1, 2}) in scc_sets
+    assert frozenset({3, 4}) in scc_sets
+
+
+def test_kosaraju_step_type():
+    g = OrientedGraph()
+    g.add_edge(0, 1)
+    steps = kosaraju_scc(g)
+    assert all(isinstance(s, Kosaraju_Step) for s in steps)
+
+
+def test_kosaraju_phases_present():
+    """Алгоритм должен содержать 3 фазы: DFS, транспонирование, DFS на G^T"""
+    g = OrientedGraph()
+    g.add_edge(0, 1)
+    g.add_edge(1, 0)
+    g.add_edge(1, 2)
+
+    steps = kosaraju_scc(g)
+    phases = [s.phase for s in steps]
+    
+    assert 1 in phases, "Фаза 1 (DFS на исходном) отсутствует"
+    assert 2 in phases, "Фаза 2 (Транспонирование) отсутствует"
+    assert 3 in phases, "Фаза 3 (DFS на транспонированном) отсутствует"
+
+
+def test_kosaraju_vs_tarjan_consistency():
+    """Результаты Косараджу и Тарьяна должны полностью совпадать"""
+    edges = [(0,1), (1,2), (2,0), (2,3), (3,4), (4,3), (4,5), (5,4)]
+    
+    g_t = OrientedGraph()
+    g_k = OrientedGraph()
+    for u, v in edges:
+        g_t.add_edge(u, v)
+        g_k.add_edge(u, v)
+
+    steps_t = tarjan_scc(g_t)
+    steps_k = kosaraju_scc(g_k)
+
+    sccs_t = set(frozenset(scc) for scc in steps_t[-1].completed_sccs)
+    sccs_k = set(frozenset(scc) for scc in steps_k[-1].completed_sccs)
+
+    assert sccs_t == sccs_k, "SCC, найденные Тарьяном и Косараджу, не совпадают"
+
+
+def test_kosaraju_disconnected():
+    """Косараджу корректно обрабатывает несвязные графы"""
+    g = OrientedGraph()
+    g.add_edge(0, 1)
+    g.add_edge(1, 0)
+    g.add_edge(2, 3)
+    g.add_edge(3, 2)
+
+    steps = kosaraju_scc(g)
+    final_sccs = steps[-1].completed_sccs
+    assert len(final_sccs) == 2
