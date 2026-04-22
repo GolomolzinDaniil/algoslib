@@ -60,8 +60,43 @@ function isInsertionStep(step) {
 }
 
 function isCountingStep(step) {
-    return Object.prototype.hasOwnProperty.call(step ?? {}, 'phase')
+    const hasLegacyShape =
+        Object.prototype.hasOwnProperty.call(step ?? {}, 'phase')
         && Array.isArray(step?.buckets);
+    const hasCppShape =
+        Object.prototype.hasOwnProperty.call(step ?? {}, 'nums_elems')
+        && step?.nums_elems !== null
+        && typeof step?.nums_elems === 'object'
+        && !Array.isArray(step?.nums_elems);
+
+    return hasLegacyShape || hasCppShape;
+}
+
+function toIndexOrMinusOne(value) {
+    const idx = Number(value);
+    return Number.isInteger(idx) ? idx : -1;
+}
+
+function pickFirstValidIndex(candidates, fallback = -1) {
+    for (const candidate of candidates) {
+        const idx = toIndexOrMinusOne(candidate);
+        if (idx >= 0) return idx;
+    }
+    return fallback;
+}
+
+function getSwapCompareIndexes(step) {
+    const compareA = pickFirstValidIndex([step?.compare_a, step?.curr_ind], -1);
+    const compareB = pickFirstValidIndex(
+        [step?.compare_b, step?.target_ind, step?.min_index],
+        compareA
+    );
+    return { compareA, compareB };
+}
+
+function getStepSortedCount(step) {
+    const value = toIndexOrMinusOne(step?.sorted_num);
+    return value >= 0 ? value : 0;
 }
 
 function getBogoStepColor(step, stepIndex) {
@@ -69,13 +104,9 @@ function getBogoStepColor(step, stepIndex) {
     return step?.is_sorted ? 'green' : 'red';
 }
 
-function getIdentityIndexes(length) {
-    return Array.from({ length }, (_, idx) => idx);
-}
-
 function normalizeBogoIndexes(indexes, length) {
     if (!Array.isArray(indexes) || indexes.length !== length) {
-        return getIdentityIndexes(length);
+        return [];
     }
 
     const normalized = [];
@@ -83,7 +114,7 @@ function normalizeBogoIndexes(indexes, length) {
     for (const rawIdx of indexes) {
         const idx = Number(rawIdx);
         if (!Number.isInteger(idx) || idx < 0 || idx >= length || seen.has(idx)) {
-            return getIdentityIndexes(length);
+            return [];
         }
         normalized.push(idx);
         seen.add(idx);
@@ -176,12 +207,11 @@ function reconstructSwapState(initial, history, upTo) {
     const values = [...initial];
     const ids = values.map((_, index) => index);
 
-    for (let i = 1; i <= upTo; i++) {
+    for (let i = 0; i <= upTo; i++) {
         const step = history[i];
         if (!step || isInsertionStep(step) || isBogoStep(step) || !step.is_swap) continue;
 
-        const a = Number(step.compare_a);
-        const b = Number(step.compare_b);
+        const { compareA: a, compareB: b } = getSwapCompareIndexes(step);
         if (!Number.isInteger(a) || !Number.isInteger(b)) continue;
         if (a < 0 || b < 0 || a >= values.length || b >= values.length) continue;
 
@@ -213,9 +243,8 @@ function updateSwapStep(container, history, initialArray, step, stepIndex, speed
     const visibleIds = ids.slice(0, maxVisible);
     const valueById = new Map(visibleIds.map((id, idx) => [id, visibleValues[idx]]));
 
-    const compare_a = Number.isInteger(step.compare_a) ? step.compare_a : -1;
-    const compare_b = Number.isInteger(step.compare_b) ? step.compare_b : -1;
-    const sortedCount = Number.isInteger(step.sorted_num) ? step.sorted_num : 0;
+    const { compareA: compare_a, compareB: compare_b } = getSwapCompareIndexes(step);
+    const sortedCount = getStepSortedCount(step);
     const transitionDuration = Math.max(120, Math.floor(speed * 0.45));
 
     const existingCells = Array.from(container.querySelectorAll('.cell[data-sort-id]'));
@@ -283,7 +312,7 @@ function reconstructInsertionState(initial, history, upTo) {
     let currentIteration = 1;
     let keyId = currentIteration < ids.length ? ids[currentIteration] : null;
 
-    for (let i = 1; i <= upTo; i++) {
+    for (let i = 0; i <= upTo; i++) {
         const step = history[i];
         if (!isInsertionStep(step)) continue;
 
@@ -335,7 +364,7 @@ function updateInsertionStep(container, history, initialArray, stepIndex, speed,
 
     const compare_a = Number.isInteger(step.compare_a) ? step.compare_a : -1;
     const compare_b = Number.isInteger(step.compare_b) ? step.compare_b : -1;
-    const sortedCount = Number.isInteger(step.sorted_num) ? step.sorted_num : 0;
+    const sortedCount = getStepSortedCount(step);
     const transitionDuration = Math.max(120, Math.floor(speed * 0.45));
 
     const existingCells = Array.from(container.querySelectorAll('.cell[data-insertion-id]'));
@@ -401,6 +430,18 @@ function getDefaultCountingBuckets(initialArray) {
     return keys.map((value) => ({ value, count: 0 }));
 }
 
+function isLegacyCountingStep(step) {
+    return Object.prototype.hasOwnProperty.call(step ?? {}, 'phase')
+        && Array.isArray(step?.buckets);
+}
+
+function isCppCountingStep(step) {
+    return Object.prototype.hasOwnProperty.call(step ?? {}, 'nums_elems')
+        && step?.nums_elems !== null
+        && typeof step?.nums_elems === 'object'
+        && !Array.isArray(step?.nums_elems);
+}
+
 function createCountingPreviewStep(initialArray) {
     return {
         phase: 'start',
@@ -415,19 +456,55 @@ function createCountingPreviewStep(initialArray) {
 }
 
 function normalizeCountingBuckets(step, initialArray) {
-    if (!Array.isArray(step?.buckets) || step.buckets.length === 0) {
-        return getDefaultCountingBuckets(initialArray);
+    if (isLegacyCountingStep(step)) {
+        if (!Array.isArray(step?.buckets) || step.buckets.length === 0) {
+            return getDefaultCountingBuckets(initialArray);
+        }
+
+        return step.buckets.map((bucket) => ({
+            value: bucket?.value,
+            count: Number.isFinite(Number(bucket?.count)) ? Number(bucket.count) : 0,
+        }));
     }
 
-    return step.buckets.map((bucket) => ({
-        value: bucket?.value,
-        count: Number.isFinite(Number(bucket?.count)) ? Number(bucket.count) : 0,
-    }));
+    if (isCppCountingStep(step)) {
+        const mapping = step.nums_elems;
+        const entries = Object.entries(mapping).map(([rawKey, rawValue]) => {
+            const numericKey = Number(rawKey);
+            const value = Number.isFinite(numericKey) ? numericKey : rawKey;
+            return {
+                value,
+                count: Number.isFinite(Number(rawValue)) ? Number(rawValue) : 0,
+            };
+        });
+
+        entries.sort((a, b) => {
+            if (typeof a.value === 'number' && typeof b.value === 'number') {
+                return a.value - b.value;
+            }
+            return String(a.value).localeCompare(String(b.value));
+        });
+        return entries;
+    }
+
+    return getDefaultCountingBuckets(initialArray);
 }
 
 function normalizeCountingOutput(step) {
     if (!Array.isArray(step?.output)) return [];
     return step.output;
+}
+
+function buildCountingOutputFromBuckets(buckets) {
+    const output = [];
+    for (const bucket of buckets) {
+        const count = Number.isFinite(Number(bucket?.count)) ? Number(bucket.count) : 0;
+        const value = bucket?.value;
+        for (let i = 0; i < count; i++) {
+            output.push(value);
+        }
+    }
+    return output;
 }
 
 function getCountingPreviewSuffix(sourceLength, maxVisible) {
@@ -502,18 +579,21 @@ function renderCountingOutputRow(row, initialArrayLength, output, writeIndex, ph
 
 function formatCountingStatus(step, stepIndex, historyLength, initialArrayLength, maxVisible) {
     const previewSuffix = getCountingPreviewSuffix(initialArrayLength, maxVisible);
-    if (step.phase === 'start') {
+    if (isLegacyCountingStep(step) && step.phase === 'start') {
         return `Старт: инициализация корзин${previewSuffix}`;
-    }
-    if (step.phase === 'count') {
-        return `🔢 Подсчёт: a[${step.source_index}] = ${step.bucket_value} → корзина ${step.bucket_value} = ${step.bucket_count}${previewSuffix}`;
     }
     if (step.phase === 'build') {
         return `📦 Сборка: ${step.bucket_value} записан в sorted[${step.write_index}]${previewSuffix}`;
     }
-    if (step.phase === 'done' || stepIndex === historyLength - 1) {
+    if (step.phase === 'done') {
         const output = normalizeCountingOutput(step).slice(0, maxVisible);
         return `✅ Готово: [${output.join(', ')}]${previewSuffix}`;
+    }
+    if (isCppCountingStep(step) && stepIndex === historyLength - 1) {
+        return `✅ Подсчёт завершён${previewSuffix}`;
+    }
+    if (step.phase === 'count' || isCppCountingStep(step)) {
+        return `🔢 Подсчёт: a[${step.source_index}] = ${step.bucket_value} → корзина ${step.bucket_value} = ${step.bucket_count}${previewSuffix}`;
     }
     return `Шаг ${stepIndex + 1} из ${historyLength}${previewSuffix}`;
 }
@@ -524,12 +604,36 @@ function updateCountingStep(container, initialArray, step, stepIndex, historyLen
     const layout = document.createElement('div');
     layout.className = 'counting-layout';
 
-    const sourceIndex = Number.isInteger(step?.source_index) ? step.source_index : -1;
-    const bucketIndex = Number.isInteger(step?.bucket_index) ? step.bucket_index : -1;
-    const writeIndex = Number.isInteger(step?.write_index) ? step.write_index : -1;
-    const phase = step?.phase ?? 'start';
+    const sourceIndex = Number.isInteger(step?.source_index) ? step.source_index : stepIndex;
+    let writeIndex = Number.isInteger(step?.write_index) ? step.write_index : -1;
+    const phase = step?.phase ?? (isCppCountingStep(step) ? 'count' : 'start');
     const buckets = normalizeCountingBuckets(step, initialArray);
-    const output = normalizeCountingOutput(step);
+    const currentValue = Number.isInteger(sourceIndex) && sourceIndex >= 0 && sourceIndex < initialArray.length
+        ? initialArray[sourceIndex]
+        : null;
+    const bucketValue = step?.bucket_value ?? currentValue;
+    const bucketIndex = Number.isInteger(step?.bucket_index)
+        ? step.bucket_index
+        : buckets.findIndex((bucket) => bucket.value === bucketValue);
+    const bucketCount = Number.isFinite(Number(step?.bucket_count))
+        ? Number(step.bucket_count)
+        : (() => {
+            const bucket = buckets.find((entry) => entry.value === bucketValue);
+            return bucket ? bucket.count : 0;
+        })();
+    let output = normalizeCountingOutput(step);
+    if (isCppCountingStep(step) && output.length === 0) {
+        output = buildCountingOutputFromBuckets(buckets);
+        writeIndex = output.length > 0 ? output.length - 1 : -1;
+    }
+    const stepForStatus = {
+        ...step,
+        source_index: sourceIndex,
+        bucket_index: bucketIndex,
+        bucket_value: bucketValue,
+        bucket_count: bucketCount,
+        phase,
+    };
 
     const source = createCountingSection('Массив', 'counting-source-section');
     renderCountingSourceRow(source.row, initialArray, sourceIndex, phase, maxVisible);
@@ -537,15 +641,19 @@ function updateCountingStep(container, initialArray, step, stepIndex, historyLen
     const bucketsSection = createCountingSection('Корзины', 'counting-buckets-section');
     renderCountingBucketsRow(bucketsSection.row, buckets, bucketIndex, phase, maxVisible);
 
-    const outputSection = createCountingSection('Отсортированный массив', 'counting-output-section');
-    renderCountingOutputRow(outputSection.row, initialArray.length, output, writeIndex, phase, maxVisible);
-
     layout.appendChild(source.section);
     layout.appendChild(bucketsSection.section);
-    layout.appendChild(outputSection.section);
+
+    const showOutput = Array.isArray(output) && output.length > 0;
+    if (showOutput) {
+        const outputSection = createCountingSection('Отсортированный массив', 'counting-output-section');
+        renderCountingOutputRow(outputSection.row, initialArray.length, output, writeIndex, phase, maxVisible);
+        layout.appendChild(outputSection.section);
+    }
+
     container.appendChild(layout);
 
-    return formatCountingStatus(step, stepIndex, historyLength, initialArray.length, maxVisible);
+    return formatCountingStatus(stepForStatus, stepIndex, historyLength, initialArray.length, maxVisible);
 }
 
 export function renderSortingCells(
@@ -610,7 +718,7 @@ function reconstructArray(initial, history, upTo) {
     }
 
     const data = [...initial];
-    for (let i = 1; i <= upTo; i++) {
+    for (let i = 0; i <= upTo; i++) {
         const currentStep = history[i];
         if (isInsertionStep(currentStep)) {
             const from = Number(currentStep.compare_a);
@@ -630,8 +738,15 @@ function reconstructArray(initial, history, upTo) {
         }
 
         if (currentStep.is_swap) {
-            [data[currentStep.compare_a], data[currentStep.compare_b]] =
-                [data[currentStep.compare_b], data[currentStep.compare_a]];
+            const { compareA, compareB } = getSwapCompareIndexes(currentStep);
+            if (
+                compareA >= 0 &&
+                compareB >= 0 &&
+                compareA < data.length &&
+                compareB < data.length
+            ) {
+                [data[compareA], data[compareB]] = [data[compareB], data[compareA]];
+            }
         }
     }
     return data;
@@ -670,9 +785,12 @@ export function formatStatus(data, step, idx, total, sourceLength = data.length)
         return `Старт: [${data.join(', ')}]${previewSuffix}`;
     } else if (idx === total - 1) {
         return `✅ Готово: [${data.join(', ')}]${previewSuffix}`;
-    } else if (step.is_swap) {
-        return `🔄 Обмен: ${step.compare_a} ↔ ${step.compare_b}`;
+    }
+
+    const { compareA, compareB } = getSwapCompareIndexes(step);
+    if (step.is_swap) {
+        return `🔄 Обмен: ${compareA} ↔ ${compareB}`;
     } else {
-        return `🔍 Сравнение: ${step.compare_a} и ${step.compare_b}`;
+        return `🔍 Сравнение: ${compareA} и ${compareB}`;
     }
 }

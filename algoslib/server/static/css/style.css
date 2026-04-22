@@ -352,6 +352,15 @@ select {
     width: 100%;
 }
 
+#searches #search-plot {
+    --search-collapsed-max-height: 166px;
+}
+
+#searches #search-plot.search-plot-collapsed {
+    max-height: var(--search-collapsed-max-height);
+    overflow: hidden;
+}
+
 .cell {
     width: 50px;
     height: 50px;
@@ -383,6 +392,28 @@ select {
     background: var(--green);
 }
 
+.search-array-toggle-wrap {
+    display: flex;
+    justify-content: center;
+    min-height: 38px;
+    margin-bottom: 6px;
+}
+
+.search-array-toggle {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 999px;
+}
+
+.search-array-toggle svg {
+    transition: transform 0.18s ease;
+}
+
+.search-array-toggle.expanded svg {
+    transform: rotate(180deg);
+}
+
 .search-result-indexes {
     display: flex;
     justify-content: center;
@@ -404,6 +435,9 @@ select {
     border-radius: var(--radius-lg);
     background: var(--surface);
     color: var(--text);
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
 }
 
 .search-result-label {
@@ -416,6 +450,8 @@ select {
     color: var(--accent);
     font-size: 15px;
     font-weight: 700;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .counting-layout {
@@ -628,6 +664,10 @@ input[type="range"] {
     .btn {
         width: 100%;
         justify-content: center;
+    }
+
+    .search-array-toggle {
+        width: 36px;
     }
 
     .counting-bucket {

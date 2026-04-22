@@ -63,7 +63,8 @@
                     <input type="file" id="sort-file" accept=".txt,text/plain">
                     <label class="file-input-action" for="sort-file">Выбрать файл</label>
                     <span class="file-input-name" id="sort-file-name">Файл не выбран</span>
-                    <button type="button" id="sort-download-file" class="file-input-download" aria-label="Скачать отсортированный .txt" title="Скачать отсортированный .txt">
+                    <button type="button" id="sort-download-file" class="file-input-download"
+                        aria-label="Скачать отсортированный .txt" title="Скачать отсортированный .txt">
                         <i data-lucide="square-arrow-down"></i>
                     </button>
                 </div>
@@ -107,6 +108,7 @@
                         <option value="dijkstra">Dijkstra</option>
                         <option value="bellman_ford">Bellman-Ford</option>
                         <option value="kruskal">Kruskal (MST)</option>
+                        <option value="stalin_sort">Stalin Sort</option>
                         <option value="ford_fulkerson">Ford-Fulkerson (Макс. поток)</option>
                         <option value="edmonds_karp">Edmonds-Karp (BFS поток)</option>
                         <option value="tarjan">Tarjan (SCC)</option>
@@ -191,11 +193,11 @@ D E</textarea>
                 <select id="search-algo">
                     <option value="" disabled selected>Выберите алгоритм</option>
                     <option value="linear_searche">Linear Search</option>
-                    <option value="linear_searche_both_sides">Linear Search Both Sides</option>
+                    <option value="linear_searche_both_sides">Bilinear Search</option>
                 </select>
             </div>
             <div class="input-row">
-                <label>Массив (через запятую, макс. 15):</label>
+                <label>Массив (через запятую):</label>
                 <input type="text" id="search-data" value="5, 3, 8, 1, 4, 2, 7, 6" placeholder="5, 3, 1, 4, 2">
             </div>
             <div class="input-row">
@@ -206,6 +208,18 @@ D E</textarea>
 
         <div class="viz-container">
             <div id="search-plot" class="plot"></div>
+        </div>
+        <div class="search-array-toggle-wrap">
+            <button
+                type="button"
+                class="btn search-array-toggle"
+                id="search-array-toggle"
+                style="display:none"
+                aria-label="Развернуть массив"
+                title="Развернуть массив"
+            >
+                <i data-lucide="chevron-down"></i>
+            </button>
         </div>
         <div id="search-result-indexes" class="search-result-indexes"></div>
 

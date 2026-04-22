@@ -6,6 +6,7 @@
 #include "dijkstra.hpp"
 #include "bellman_ford.hpp"
 #include "kruskal.hpp"
+#include "stalin_sort.hpp"
 #include "ford_fulkerson.hpp"
 #include "edmonds_karp.hpp"
 #include "tarjan.hpp"
@@ -97,6 +98,26 @@ PYBIND11_MODULE(sub_graphs, m) {
           "Алгоритм Краскала. Возвращает список шагов (List[Kruskal_Step]). "
           "Строит минимальное остовное дерево.");
 
+    // Структура шага алгоритма Сталин-сорта для графов
+    py::class_<Stalin_Step>(m, "Stalin_Step")
+        .def_readonly("current_node", &Stalin_Step::current_node,
+                      "Текущая рассматриваемая вершина")
+        .def_readonly("accepted", &Stalin_Step::accepted,
+                      "Была ли вершина принята в клику (bool)")
+        .def_readonly("conflict_with", &Stalin_Step::conflict_with,
+                      "Вершина клики, с которой возник конфликт (-1 если нет)")
+        .def_readonly("clique", &Stalin_Step::clique,
+                      "Текущее множество оставленных вершин (клика)")
+        .def_readonly("exiled", &Stalin_Step::exiled,
+                      "Вершины, отправленные в ссылку");
+
+    // Функция stalin_sort
+    m.def("stalin_sort",
+          &stalin_sort,
+          py::arg("graph"),
+          "Сталин-сорт для графов. Возвращает список шагов (List[Stalin_Step]). "
+          "Оставляет только вершины, образующие клику, остальные ссылает.");
+
     py::class_<Flow_Graph>(m, "Flow_Graph")
         .def(py::init<>())
         .def("add_edge", 
@@ -152,7 +173,7 @@ PYBIND11_MODULE(sub_graphs, m) {
         .def_readonly("history", &EdmondsKarp_Result::history,
                     "История шагов");
 
-    m.def("edmonds_karp", 
+    m.def("edmonds_karp",
         &edmonds_karp,
         py::arg("graph"), py::arg("source"), py::arg("sink"),
         "Алгоритм Эдмондса-Карпа (BFS версия Форда-Фалкерсона)");

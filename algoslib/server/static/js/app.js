@@ -55,8 +55,12 @@ const SORTING_META = {
 };
 const MAX_SORT_ITEMS = 15;
 const MAX_SORT_VISUAL_ITEMS = 15;
-const MAX_SEARCH_ITEMS = 15;
-const MAX_SEARCH_VISUAL_ITEMS = 15;
+const SEARCH_COLLAPSED_MAX_ROWS = 3;
+const SEARCH_COLLAPSED_ROW_HEIGHT = 50;
+const SEARCH_COLLAPSED_ROW_GAP = 8;
+const SEARCH_COLLAPSED_MAX_HEIGHT =
+    SEARCH_COLLAPSED_MAX_ROWS * SEARCH_COLLAPSED_ROW_HEIGHT +
+    (SEARCH_COLLAPSED_MAX_ROWS - 1) * SEARCH_COLLAPSED_ROW_GAP;
 
 const SEARCH_META = {
     linear_searche: {
@@ -66,7 +70,7 @@ const SEARCH_META = {
         memory: "Память: О(1)",
     },
     linear_searche_both_sides: {
-        title: "Linear Search Both Sides",
+        title: "Bilinear",
         desc: "Проверяет элементы одновременно с начала и конца массива",
         time: "Время: O(n)",
         memory: "Память: О(1)",
@@ -217,6 +221,9 @@ const searchResultIndexes = document.getElementById('search-result-indexes');
 const searchDataInput = document.getElementById('search-data');
 const searchTargetInput = document.getElementById('search-target');
 const searchAlgoSelect = document.getElementById('search-algo');
+const searchArrayToggle = document.getElementById('search-array-toggle');
+let searchPlotCollapsed = true;
+let searchToggleRaf = null;
 
 function parseSortInput(raw) {
     return raw
@@ -255,12 +262,209 @@ function resetSortingSession() {
     if (sortPlayer.el.status) sortPlayer.el.status.textContent = '';
 }
 
+function normalizeSortingHistory(history) {
+    if (!Array.isArray(history)) return [];
+    return history
+        .filter((step) => step && typeof step === 'object' && !Array.isArray(step))
+        .map((step) => ({ ...step }));
+}
+
+function normalizePermutation(indexes, length) {
+    if (!Array.isArray(indexes) || indexes.length !== length) return [];
+    const seen = new Set();
+    const normalized = [];
+
+    for (const rawIdx of indexes) {
+        const idx = Number(rawIdx);
+        if (!Number.isInteger(idx) || idx < 0 || idx >= length || seen.has(idx)) {
+            return [];
+        }
+        seen.add(idx);
+        normalized.push(idx);
+    }
+    return normalized;
+}
+
+function toStableValueKey(value) {
+    if (typeof value === 'number' && Number.isNaN(value)) return 'number:NaN';
+    return `${typeof value}:${String(value)}`;
+}
+
+function buildPermutationForSortedArray(initialArray, sortedArray, fallbackIndexes = []) {
+    const length = Array.isArray(initialArray) ? initialArray.length : 0;
+    if (!Array.isArray(sortedArray) || sortedArray.length !== length || length === 0) {
+        const normalizedFallback = normalizePermutation(fallbackIndexes, length);
+        return normalizedFallback.length === length
+            ? normalizedFallback
+            : Array.from({ length }, (_, idx) => idx);
+    }
+
+    const valueToIndexes = new Map();
+    initialArray.forEach((value, idx) => {
+        const key = toStableValueKey(value);
+        if (!valueToIndexes.has(key)) valueToIndexes.set(key, []);
+        valueToIndexes.get(key).push(idx);
+    });
+
+    const permutation = [];
+    for (const value of sortedArray) {
+        const key = toStableValueKey(value);
+        const queue = valueToIndexes.get(key);
+        if (!queue || queue.length === 0) {
+            const normalizedFallback = normalizePermutation(fallbackIndexes, length);
+            return normalizedFallback.length === length
+                ? normalizedFallback
+                : Array.from({ length }, (_, idx) => idx);
+        }
+        permutation.push(queue.shift());
+    }
+
+    const normalizedPermutation = normalizePermutation(permutation, length);
+    if (normalizedPermutation.length === length) {
+        return normalizedPermutation;
+    }
+
+    const normalizedFallback = normalizePermutation(fallbackIndexes, length);
+    return normalizedFallback.length === length
+        ? normalizedFallback
+        : Array.from({ length }, (_, idx) => idx);
+}
+
+function buildSortedArrayFromCountingMap(numsElems) {
+    if (!numsElems || typeof numsElems !== 'object' || Array.isArray(numsElems)) return [];
+
+    const numericEntries = [];
+    const stringEntries = [];
+
+    for (const [rawValue, rawCount] of Object.entries(numsElems)) {
+        const count = Number(rawCount);
+        if (!Number.isFinite(count) || count <= 0) continue;
+
+        const numericValue = Number(rawValue);
+        if (Number.isFinite(numericValue)) {
+            numericEntries.push([numericValue, Math.trunc(count)]);
+        } else {
+            stringEntries.push([rawValue, Math.trunc(count)]);
+        }
+    }
+
+    numericEntries.sort((a, b) => a[0] - b[0]);
+    stringEntries.sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+
+    const output = [];
+    for (const [value, count] of [...numericEntries, ...stringEntries]) {
+        for (let i = 0; i < count; i++) output.push(value);
+    }
+    return output;
+}
+
+function toIndexOrMinusOne(value) {
+    const idx = Number(value);
+    return Number.isInteger(idx) ? idx : -1;
+}
+
+function pickFirstValidIndex(candidates, fallback = -1) {
+    for (const candidate of candidates) {
+        const idx = toIndexOrMinusOne(candidate);
+        if (idx >= 0) return idx;
+    }
+    return fallback;
+}
+
+function getSortingStepCompareIndexes(step) {
+    const compareA = pickFirstValidIndex([step?.compare_a, step?.curr_ind], -1);
+    const compareB = pickFirstValidIndex(
+        [step?.compare_b, step?.target_ind, step?.min_index],
+        compareA
+    );
+    return { compareA, compareB };
+}
+
+function ensureFinalSortingGreenStep(history, algo, initialArray, sortedArray) {
+    const safeHistory = normalizeSortingHistory(history);
+    const dataLength = Array.isArray(initialArray) ? initialArray.length : 0;
+
+    if (safeHistory.length === 0 || dataLength === 0) return safeHistory;
+
+    const lastStep = safeHistory[safeHistory.length - 1] || {};
+
+    if (algo === 'bogo') {
+        const hasFinalGreenStep =
+            Boolean(lastStep.is_sorted) &&
+            normalizePermutation(lastStep.indexes, dataLength).length === dataLength;
+
+        if (hasFinalGreenStep) return safeHistory;
+
+        const fallbackIndexes = normalizePermutation(lastStep.indexes, dataLength);
+        const finalIndexes = buildPermutationForSortedArray(initialArray, sortedArray, fallbackIndexes);
+        safeHistory.push({ indexes: finalIndexes, is_sorted: true });
+        return safeHistory;
+    }
+
+    if (algo === 'counting') {
+        const doneOutput = Array.isArray(lastStep.output) ? lastStep.output : [];
+        const hasFinalGreenStep =
+            String(lastStep.phase || '').toLowerCase() === 'done' &&
+            doneOutput.length >= dataLength;
+
+        if (hasFinalGreenStep) return safeHistory;
+
+        let output = [];
+        if (Array.isArray(sortedArray) && sortedArray.length === dataLength) {
+            output = [...sortedArray];
+        } else {
+            output = buildSortedArrayFromCountingMap(lastStep.nums_elems);
+        }
+
+        if (output.length === 0) return safeHistory;
+
+        safeHistory.push({
+            ...lastStep,
+            phase: 'done',
+            source_index: -1,
+            bucket_index: -1,
+            bucket_value: null,
+            bucket_count: 0,
+            write_index: -1,
+            output: [...output],
+        });
+        return safeHistory;
+    }
+
+    const sortedNum = Number.isInteger(lastStep.sorted_num) ? lastStep.sorted_num : 0;
+    if (sortedNum >= dataLength) return safeHistory;
+
+    if (algo === 'insertion') {
+        safeHistory.push({
+            compare_a: -1,
+            compare_b: -1,
+            is_swap: false,
+            sorted_num: dataLength,
+        });
+        return safeHistory;
+    }
+
+    safeHistory.push({
+        ...lastStep,
+        compare_a: -1,
+        compare_b: -1,
+        is_swap: false,
+        sorted_num: dataLength,
+    });
+    return safeHistory;
+}
+
 function applySortingResult(result, algo) {
-    sortData.history = result.history || [];
-    sortData.initialArray = result.initial_array || [];
+    sortData.initialArray = Array.isArray(result.initial_array) ? result.initial_array : [];
     sortData.sortedArray = Array.isArray(result.sorted_array)
         ? result.sorted_array
-        : [...sortData.initialArray].sort((a, b) => a - b);
+        : [];
+    sortData.history = ensureFinalSortingGreenStep(
+        result.history,
+        algo,
+        sortData.initialArray,
+        sortData.sortedArray
+    );
     sortPlayer.steps = sortData.history;
     sortPlayer.current = 0;
 
@@ -279,8 +483,7 @@ function applySortingResult(result, algo) {
 
     const direction = result.direction || meta.direction || 'end';
     const firstStep = sortData.history[0] || {};
-    const compareA = Number.isInteger(firstStep.compare_a) ? firstStep.compare_a : -1;
-    const compareB = Number.isInteger(firstStep.compare_b) ? firstStep.compare_b : -1;
+    const { compareA, compareB } = getSortingStepCompareIndexes(firstStep);
     const sortedNum = Number.isInteger(firstStep.sorted_num) ? firstStep.sorted_num : 0;
 
     renderSortingCells(
@@ -495,6 +698,46 @@ function parseSearchTarget(raw) {
     return value;
 }
 
+function applySearchPlotCollapsedState() {
+    if (!searchPlot) return;
+
+    searchPlot.classList.toggle('search-plot-collapsed', searchPlotCollapsed);
+
+    if (!searchArrayToggle) return;
+    searchArrayToggle.classList.toggle('expanded', !searchPlotCollapsed);
+    const label = searchPlotCollapsed ? 'Развернуть массив' : 'Свернуть массив';
+    searchArrayToggle.setAttribute('aria-label', label);
+    searchArrayToggle.title = label;
+}
+
+function syncSearchArrayToggle() {
+    if (!searchPlot || !searchArrayToggle) return;
+
+    if (searchToggleRaf !== null) {
+        cancelAnimationFrame(searchToggleRaf);
+    }
+
+    searchToggleRaf = requestAnimationFrame(() => {
+        searchToggleRaf = null;
+
+        const hasCells = searchPlot.children.length > 0;
+        const hasOverflow = hasCells && searchPlot.scrollHeight > SEARCH_COLLAPSED_MAX_HEIGHT + 1;
+
+        if (!hasOverflow) {
+            searchPlotCollapsed = true;
+            searchArrayToggle.style.display = 'none';
+            searchPlot.classList.remove('search-plot-collapsed');
+            searchArrayToggle.classList.remove('expanded');
+            searchArrayToggle.setAttribute('aria-label', 'Развернуть массив');
+            searchArrayToggle.title = 'Развернуть массив';
+            return;
+        }
+
+        searchArrayToggle.style.display = 'inline-flex';
+        applySearchPlotCollapsedState();
+    });
+}
+
 function setSearchResultIndexes(indexes) {
     if (!searchResultIndexes) return;
 
@@ -506,7 +749,7 @@ function setSearchResultIndexes(indexes) {
     const value = indexes.join(', ');
     searchResultIndexes.innerHTML =
         `<div class="search-result-chip">` +
-        `<span class="search-result-label">Индексы искомого элемента:</span>` +
+        `<span class="search-result-label">Индекс искомого элемента</span>` +
         `<span class="search-result-value">${value}</span>` +
         `</div>`;
 }
@@ -515,6 +758,7 @@ function resetSearchSession() {
     stopPlayer(searchPlayer);
     searchPlayer.steps = [];
     searchPlayer.current = 0;
+    searchPlotCollapsed = true;
     searchData = {
         steps: [],
         initialArray: [],
@@ -525,6 +769,7 @@ function resetSearchSession() {
     };
     if (searchPlot) searchPlot.innerHTML = '';
     setSearchResultIndexes([]);
+    syncSearchArrayToggle();
     if (searchPlayer.el.status) searchPlayer.el.status.textContent = '';
 }
 
@@ -533,33 +778,70 @@ function renderSearchInputPreview() {
     const data = parseSortInput(searchDataInput?.value || '');
     if (data.length === 0) {
         searchPlot.innerHTML = '';
+        syncSearchArrayToggle();
         return;
     }
-    renderSearchCells(searchPlot, data, -1, [], -1, MAX_SEARCH_VISUAL_ITEMS);
+    renderSearchCells(searchPlot, data, -1, [], -1);
+    syncSearchArrayToggle();
 }
 
-function appendSearchFinalStep(steps, resultIndexes) {
-    if (!Array.isArray(steps) || steps.length === 0) return steps;
-    const finalFound = Array.isArray(resultIndexes)
-        ? [...new Set(resultIndexes)]
+function normalizeSearchResultIndexes(resultIndexes, dataLength) {
+    if (!Array.isArray(resultIndexes)) return [];
+    return resultIndexes
+        .map((idx) => Number(idx))
+        .filter((idx) => Number.isInteger(idx) && idx >= 0 && idx < dataLength);
+}
+
+function isSameIndexOrder(left, right) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    for (let i = 0; i < left.length; i++) {
+        if (left[i] !== right[i]) return false;
+    }
+    return true;
+}
+
+function appendFinalSearchResultStep(steps, resultIndexes) {
+    const safeSteps = Array.isArray(steps) ? [...steps] : [];
+    if (!Array.isArray(resultIndexes) || resultIndexes.length === 0) return safeSteps;
+
+    const lastStep = safeSteps[safeSteps.length - 1] || {};
+    const lastCurrentIndices = Array.isArray(lastStep.current_indices)
+        ? lastStep.current_indices
+        : (
+            Number.isInteger(lastStep.current_index) && lastStep.current_index >= 0
+                ? [lastStep.current_index]
+                : []
+        );
+    const lastFoundIndices = Array.isArray(lastStep.found_indices)
+        ? lastStep.found_indices
         : [];
-    steps.push({
+
+    if (lastCurrentIndices.length === 0 && isSameIndexOrder(lastFoundIndices, resultIndexes)) {
+        return safeSteps;
+    }
+
+    const checkedUntil = Number.isInteger(lastStep.checked_until)
+        ? lastStep.checked_until
+        : (
+            lastCurrentIndices.length > 0
+                ? lastCurrentIndices[lastCurrentIndices.length - 1]
+                : -1
+        );
+
+    safeSteps.push({
         current_indices: [],
         current_index: -1,
-        checked_until: -1,
-        found_indices: finalFound,
-        is_match: finalFound.length > 0,
+        checked_until: checkedUntil,
+        found_indices: [...resultIndexes],
+        is_match: true,
     });
-    return steps;
+
+    return safeSteps;
 }
 
 function buildSearchSteps(data, resultIndexes, historyIndexes = []) {
     const safeData = Array.isArray(data) ? data : [];
-    const safeResultIndexes = Array.isArray(resultIndexes)
-        ? resultIndexes
-            .map((idx) => Number(idx))
-            .filter((idx) => Number.isInteger(idx) && idx >= 0 && idx < safeData.length)
-        : [];
+    const safeResultIndexes = normalizeSearchResultIndexes(resultIndexes, safeData.length);
     const resultSet = new Set(safeResultIndexes);
     const foundSet = new Set();
     const foundSoFar = [];
@@ -581,19 +863,7 @@ function buildSearchSteps(data, resultIndexes, historyIndexes = []) {
             .filter((item) => item !== null);
 
         if (pairHistory.length === 0) {
-            const fallbackFound = [];
-            const fallbackSteps = Array.from({ length: safeData.length }, (_, idx) => {
-                const isMatch = resultSet.has(idx);
-                if (isMatch && !fallbackFound.includes(idx)) fallbackFound.push(idx);
-                return {
-                    current_indices: [idx],
-                    current_index: idx,
-                    checked_until: idx,
-                    found_indices: [...fallbackFound],
-                    is_match: isMatch,
-                };
-            });
-            return appendSearchFinalStep(fallbackSteps, safeResultIndexes);
+            return appendFinalSearchResultStep([], safeResultIndexes);
         }
 
         for (const pair of pairHistory) {
@@ -619,15 +889,13 @@ function buildSearchSteps(data, resultIndexes, historyIndexes = []) {
                 is_match: isMatch,
             });
         }
-        return appendSearchFinalStep(steps, safeResultIndexes);
+        return appendFinalSearchResultStep(steps, safeResultIndexes);
     }
 
     const linearHistory = rawHistory
         .map((idx) => Number(idx))
         .filter((idx) => Number.isInteger(idx) && idx >= 0 && idx < safeData.length);
-    const traversal = linearHistory.length > 0
-        ? linearHistory
-        : Array.from({ length: safeData.length }, (_, idx) => idx);
+    const traversal = linearHistory;
 
     for (const idx of traversal) {
         const isMatch = resultSet.has(idx);
@@ -644,7 +912,7 @@ function buildSearchSteps(data, resultIndexes, historyIndexes = []) {
         });
     }
 
-    return appendSearchFinalStep(steps, safeResultIndexes);
+    return appendFinalSearchResultStep(steps, safeResultIndexes);
 }
 
 function applySearchResult(apiResult, data, target) {
@@ -657,8 +925,8 @@ function applySearchResult(apiResult, data, target) {
         initialArray: [...data],
         result: [...resultIndexes],
         target,
-        source: apiResult?.source || 'python',
-        historySource: apiResult?.history_source || apiResult?.source || 'python',
+        source: apiResult?.source || 'cpp',
+        historySource: apiResult?.history_source || apiResult?.source || 'cpp',
     };
     searchPlayer.steps = steps;
     searchPlayer.current = 0;
@@ -667,13 +935,15 @@ function applySearchResult(apiResult, data, target) {
     if (searchData.initialArray.length === 0) {
         searchPlot.innerHTML = '';
         setSearchResultIndexes([]);
+        syncSearchArrayToggle();
         searchPlayer.el.status.textContent = 'Нет данных для визуализации';
         return;
     }
 
     if (searchData.steps.length === 0) {
-        renderSearchCells(searchPlot, searchData.initialArray, -1, [], -1, MAX_SEARCH_VISUAL_ITEMS);
+        renderSearchCells(searchPlot, searchData.initialArray, -1, [], -1);
         setSearchResultIndexes([]);
+        syncSearchArrayToggle();
         searchPlayer.el.status.textContent = 'Совпадений нет';
         return;
     }
@@ -686,10 +956,10 @@ function applySearchResult(apiResult, data, target) {
         searchData.initialArray,
         firstStep.current_indices || firstStep.current_index,
         firstStep.found_indices,
-        firstStep.checked_until,
-        MAX_SEARCH_VISUAL_ITEMS
+        firstStep.checked_until
     );
 
+    syncSearchArrayToggle();
     renderSearchStep(0);
 }
 
@@ -697,10 +967,6 @@ async function loadSearchData() {
     const data = parseSortInput(searchDataInput?.value || '');
     if (data.length === 0) {
         throw new Error('Введите числа через запятую');
-    }
-
-    if (data.length > MAX_SEARCH_ITEMS) {
-        throw new Error(`Можно ввести максимум ${MAX_SEARCH_ITEMS} чисел`);
     }
 
     const algo = searchAlgoSelect?.value;
@@ -731,14 +997,17 @@ function renderSearchStep(idx) {
         searchPlot,
         searchData.steps,
         searchData.initialArray,
-        idx,
-        MAX_SEARCH_VISUAL_ITEMS
+        idx
     );
     searchPlayer.el.status.textContent = msg;
+    syncSearchArrayToggle();
 
     const isLastStep = searchData.steps.length > 0 && idx >= searchData.steps.length - 1;
     if (isLastStep) {
-        setSearchResultIndexes(searchData.result);
+        const visibleResult = Array.isArray(searchData.steps[idx]?.found_indices)
+            ? searchData.steps[idx].found_indices
+            : [];
+        setSearchResultIndexes(visibleResult);
     } else {
         setSearchResultIndexes([]);
     }
@@ -768,21 +1037,9 @@ if (searchAlgoSelect) {
 }
 
 if (searchDataInput) {
-    searchDataInput.addEventListener('input', (e) => {
-        const input = e.target;
-        const numbers = parseSortInput(input.value);
-        let isClamped = false;
-
-        if (numbers.length > MAX_SEARCH_ITEMS) {
-            input.value = numbers.slice(0, MAX_SEARCH_ITEMS).join(', ');
-            isClamped = true;
-        }
-
+    searchDataInput.addEventListener('input', () => {
         resetSearchSession();
         renderSearchInputPreview();
-        if (isClamped) {
-            searchPlayer.el.status.textContent = `Можно ввести максимум ${MAX_SEARCH_ITEMS} чисел`;
-        }
     });
 }
 
@@ -792,6 +1049,17 @@ if (searchTargetInput) {
         renderSearchInputPreview();
     });
 }
+
+if (searchArrayToggle) {
+    searchArrayToggle.addEventListener('click', () => {
+        searchPlotCollapsed = !searchPlotCollapsed;
+        applySearchPlotCollapsedState();
+    });
+}
+
+window.addEventListener('resize', () => {
+    syncSearchArrayToggle();
+});
 
 searchPlayer.el.play.addEventListener('click', async () => {
     const algo = searchAlgoSelect?.value;
@@ -845,7 +1113,7 @@ const graphSvg = document.getElementById('graph-svg');
 const graphInfo = document.getElementById('graph-info');
 
 const spacingSlider = document.getElementById('graph-spacing');
-const spacingVal   = document.getElementById('graph-spacing-val');
+const spacingVal = document.getElementById('graph-spacing-val');
 spacingSlider.addEventListener('input', () => {
     spacingVal.textContent = spacingSlider.value;
     setSpacing(Number(spacingSlider.value));
@@ -886,7 +1154,7 @@ document.getElementById('graph-algo').addEventListener('change', (e) => {
     }
     
     const startInput = document.getElementById('graph-start');
-    if (algo === 'kruskal' || algo === 'tarjan' || algo === 'kosaraju') { 
+    if (algo === 'kruskal' || algo === 'tarjan' || algo === 'kosaraju' || algo === 'stalin_sort') { 
         startInput.disabled = true;
         startInput.placeholder = 'Не требуется';
     } else {
@@ -914,6 +1182,9 @@ document.getElementById('graph-example').addEventListener('click', () => {
     } else if (algo === 'tarjan' || algo === 'kosaraju') { 
     document.getElementById('graph-edges').value = 'A B\nB C\nC A\nC D\nD E\nE D\nF C';
     document.getElementById('graph-start').value = '';
+    } else if (algo === 'stalin_sort') {
+        document.getElementById('graph-edges').value = 'A B\nA C\nB C\nC D\nD E\nB E';
+        document.getElementById('graph-start').value = '';
     } else {
         document.getElementById('graph-edges').value = 'A B\nA C\nB D\nC D\nD E\nE F\nC F';
         document.getElementById('graph-start').value = 'A';
@@ -946,13 +1217,13 @@ document.getElementById('graph-run').addEventListener('click', async () => {
         return;
     }
 
-    if (!startNode && algo !== 'kruskal' && algo !== 'ford_fulkerson' && algo !== 'tarjan' && algo !== 'kosaraju') {
+    if (!startNode && algo !== 'kruskal' && algo !== 'ford_fulkerson' && algo !== 'tarjan' && algo !== 'kosaraju' && algo !== 'stalin_sort') {
         graphPlayer.el.status.textContent = 'Введите стартовую ноду';
         return;
     }
 
-    const sinkNode = algo === 'ford_fulkerson' || algo === 'edmonds_karp' 
-        ? document.getElementById('graph-sink')?.value.trim() 
+    const sinkNode = algo === 'ford_fulkerson' || algo === 'edmonds_karp'
+        ? document.getElementById('graph-sink')?.value.trim()
         : null;
 
     if (algo === 'ford_fulkerson' || algo === 'edmonds_karp') {
@@ -971,12 +1242,13 @@ document.getElementById('graph-run').addEventListener('click', async () => {
             graphPlayer.el.status.textContent = 'Название ноды должно быть не длиннее 3 символов';
             return;
         }
-        if (algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal' || 
+        if (algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal' ||
             algo === 'ford_fulkerson' || algo === 'edmonds_karp') {
             if (parts.length >= 3) edges.push([parts[0], parts[1], parts[2]]);
         } else if (parts.length >= 2) {
             edges.push([parts[0], parts[1]]);
         }
+
     }
 
     if (edges.length === 0) {
@@ -987,12 +1259,12 @@ document.getElementById('graph-run').addEventListener('click', async () => {
     graphPlayer.el.status.textContent = 'Загрузка...';
 
     try {
-        const reqBody = algo === 'kruskal' || algo === 'tarjan' || algo === 'kosaraju'
+        const reqBody = (algo === 'kruskal' || algo === 'tarjan' || algo === 'kosaraju' || algo === 'stalin_sort')
             ? { edges }
             : algo === 'ford_fulkerson' || algo === 'edmonds_karp'
                 ? { edges, start_node: startNode, sink: sinkNode }
                 : { edges, start_node: startNode };
-                
+
         const res = await fetch(`/api/graphs/${algo}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1011,7 +1283,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
             algorithm: algo,
             nodeLabels: result.node_labels || {},
             source: result.source,
-            sink: result.sink,  
+            sink: result.sink,
         };
         graphPlayer.steps = result.steps;
         graphPlayer.current = 0;

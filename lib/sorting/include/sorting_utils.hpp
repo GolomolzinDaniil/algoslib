@@ -125,6 +125,7 @@ inline py::list to_py(const std::vector<Quick_step>& history)
                 py::arg("low") = step.low,
                 py::arg("high") = step.high,
                 py::arg("curr_ind") = step.curr_ind,
+                py::arg("target_ind") = step.target_ind,
                 py::arg("is_swap") = step.is_swap
             )
         );
