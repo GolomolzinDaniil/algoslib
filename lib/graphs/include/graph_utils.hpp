@@ -70,3 +70,19 @@ struct Flow_Graph {
         return adjacency_list.at(u);
     }
 };
+
+struct OrientedGraph {
+    std::unordered_map<int, std::vector<int>> adjacency_list;
+    void add_edge(int u, int v) {
+        adjacency_list[u].push_back(v);
+        if (!adjacency_list.count(v)) {
+            adjacency_list[v] = {};
+        }
+    }
+
+    const std::vector<int>& get_neighbors(int u) const {
+        static const std::vector<int> empty;
+        auto it = adjacency_list.find(u);
+        return (it != adjacency_list.end()) ? it->second : empty;
+    }
+};

@@ -28,6 +28,17 @@ const COLORS = {
     residualText: '#9cdcfe',
 };
 
+const SCC_PALETTE = [
+    '#f38ba8', '#89b4fa', '#a6e3a1', '#fab387', '#cba6f7',
+    '#f9e2af', '#94e2d5', '#eba0ac', '#b4befe', '#74c7ec'
+];
+
+const PHASE_COLORS = {
+    1: { node: '#89b4fa', edge: '#89b4fa', label: 'Фаза 1: DFS (исходный граф)' },
+    2: { node: '#fab387', edge: '#fab387', label: 'Фаза 2: Транспонирование' },
+    3: { node: '#cba6f7', edge: '#cba6f7', label: 'Фаза 3: DFS (транспонированный)' },
+};
+
 const NODE_R = 22;
 const W = 600;
 const H = 400;
@@ -494,5 +505,192 @@ function formatInfo(step, algorithm, nodeLabels = {}) {
         lines.push(`<span class="label">Расстояния:</span> <span class="value">{${dists}}</span>`);
     }
 
+    return lines.join('<br>');
+}
+
+export function updateTarjanStep(svg, nodes, edges, step, nodeLabels = {}) {
+    const visited = new Set(Object.keys(step.index_map || {}).map(Number));
+    const onStack = new Set(step.on_stack_nodes || []);
+
+    // Создаём маппинг: вершина -> индекс SCC (для уже найденных компонент)
+    const nodeToSccIndex = {};
+    (step.completed_sccs || []).forEach((scc, idx) => {
+        for (const n of scc) nodeToSccIndex[n] = idx;
+    });
+
+    let activeEdge = null;
+    let edgeColor = COLORS.defaultEdge;
+    if (step.edge_from !== null && step.edge_to !== null) {
+        activeEdge = [step.edge_from, step.edge_to];
+        switch (step.edge_type) {
+            case 'tree': edgeColor = COLORS.activeEdge; break;
+            case 'back': edgeColor = COLORS.relaxedEdge; break;
+            case 'cross': case 'forward': edgeColor = '#7a7a7a'; break;
+            default: edgeColor = COLORS.defaultEdge;
+        }
+    }
+
+    const currentSccSet = new Set(step.current_scc || []);
+    const nodeColors = {};
+
+    for (const n of nodes) {
+        if (currentSccSet.has(n)) {
+            // Вершины, которые извлекаются прямо сейчас (ярко-красный акцент)
+            nodeColors[n] = COLORS.current;
+        } else if (nodeToSccIndex[n] !== undefined) {
+            // Вершины в уже найденных SCC → уникальный цвет из палитры
+            const sccIdx = nodeToSccIndex[n];
+            nodeColors[n] = SCC_PALETTE[sccIdx % SCC_PALETTE.length];
+        } else if (onStack.has(n)) {
+            nodeColors[n] = COLORS.queue; // Оранжевый (в стеке DFS)
+        } else if (visited.has(n)) {
+            nodeColors[n] = COLORS.defaultNode; // Синий (посещена, но ещё не в SCC)
+        } else {
+            nodeColors[n] = '#3e3e42'; // Тёмно-серый (не посещена)
+        }
+    }
+
+    draw(svg, nodes, edges, false, nodeColors, {}, activeEdge, null, nodeLabels, null, edgeColor);
+
+    const lines = [];
+    const actionLabels = { 'visit': 'Посещение', 'explore_edge': 'Исследование ребра', 'update_lowlink': 'Обновление lowlink', 'found_scc': 'Найдена SCC!', 'done': 'Завершено' };
+    lines.push(`<span class="label">Действие:</span> <span class="value">${actionLabels[step.action] || step.action}</span>`);
+    
+    if (step.current_node !== null) lines.push(`<span class="label">Вершина:</span> <span class="value">${getNodeLabel(step.current_node, nodeLabels)}</span>`);
+    if (activeEdge) lines.push(`<span class="label">Ребро:</span> <span class="value">${getNodeLabel(step.edge_from, nodeLabels)} → ${getNodeLabel(step.edge_to, nodeLabels)} (${step.edge_type})</span>`);
+    
+    if (step.current_node !== null && step.index_map?.[step.current_node] !== undefined) {
+        lines.push(`<span class="label">index/lowlink:</span> <span class="value">${step.index_map[step.current_node]} / ${step.lowlink_map?.[step.current_node] ?? step.index_map[step.current_node]}</span>`);
+    }
+    
+    const stackLabels = (step.stack || []).map(n => getNodeLabel(n, nodeLabels)).join(' → ') || '—';
+    lines.push(`<span class="label">Стек:</span> <span class="value">[${stackLabels}]</span>`);
+    
+    if (step.current_scc?.length > 0) {
+        lines.push(`<span class="label">SCC найдена:</span> <span class="value">{${step.current_scc.map(n => getNodeLabel(n, nodeLabels)).join(', ')}}</span>`);
+    }
+    
+    if (step.completed_sccs?.length > 0) {
+        const all = step.completed_sccs.map((scc, i) => {
+            const color = SCC_PALETTE[i % SCC_PALETTE.length];
+            return `<span style="color:${color}; font-size:1.1em;">■</span> {${scc.map(n => getNodeLabel(n, nodeLabels)).join(', ')}}`;
+        }).join(', ');
+        lines.push(`<span class="label">Все SCC:</span> <span class="value">[${all}]</span>`);
+    }
+    
+    return lines.join('<br>');
+}
+
+export function updateKosarajuStep(svg, nodes, edges, step, nodeLabels = {}) {
+    const phase = step.phase || 1;
+    const phaseStyle = PHASE_COLORS[phase] || PHASE_COLORS[1];
+    
+    // Маппинг вершина -> индекс SCC
+    const nodeToSccIndex = {};
+    (step.completed_sccs || []).forEach((scc, idx) => {
+        for (const n of scc) nodeToSccIndex[n] = idx;
+    });
+
+    let activeEdge = null;
+    let edgeColor = COLORS.defaultEdge;
+    
+    if (step.edge_from !== null && step.edge_to !== null) {
+        activeEdge = [step.edge_from, step.edge_to];
+        edgeColor = step.is_transposed_edge ? COLORS.reverseEdge : phaseStyle.edge;
+    }
+
+    const currentSccSet = new Set(step.current_scc || []);
+    const nodeColors = {};
+
+    for (const n of nodes) {
+        if (currentSccSet.has(n)) {
+            nodeColors[n] = COLORS.current;  // Ярко-красный для текущей SCC
+        } else if (nodeToSccIndex[n] !== undefined) {
+            const sccIdx = nodeToSccIndex[n];
+            nodeColors[n] = SCC_PALETTE[sccIdx % SCC_PALETTE.length];
+        } else if (phase === 1) {
+            // Фаза 1: подсветка по посещению/завершению
+            if (step.finish_order.includes(n)) {
+                nodeColors[n] = COLORS.visited;  // Уже завершена
+            } else if (step.stack.includes(n)) {
+                nodeColors[n] = COLORS.queue;    // В стеке
+            } else {
+                nodeColors[n] = '#3e3e42';       // Не посещена
+            }
+        } else if (phase === 3) {
+            // Фаза 3: обработанные вершины
+            if (step.processing_order.indexOf(n) < step.processing_order.indexOf(step.current_node ?? -1)) {
+                nodeColors[n] = COLORS.visited;
+            } else {
+                nodeColors[n] = '#3e3e42';
+            }
+        } else {
+            nodeColors[n] = phaseStyle.node;  // Фаза 2: нейтральный цвет
+        }
+    }
+
+    // Отрисовка: для фазы 2 показываем рёбра как развёрнутые (пунктир)
+    const isTransposedPhase = phase === 2;
+    draw(
+        svg,
+        nodes,
+        edges,
+        false,
+        nodeColors,
+        {},
+        activeEdge,
+        null,
+        nodeLabels,
+        null,
+        edgeColor,
+    );
+
+    // Инфо-панель
+    const lines = [];
+    lines.push(`<span class="label">Фаза:</span> <span class="value">${phaseStyle.label}</span>`);
+    
+    const actionLabels = {
+        'start_dfs1': 'Запуск DFS на исходном графе',
+        'visit': 'Посещение вершины',
+        'finish': 'Завершение вершины (добавлена в стек)',
+        'transpose': 'Транспонирование графа',
+        'transpose_edge': `Разворот ребра`,
+        'start_dfs2': 'Запуск DFS на транспонированном графе',
+        'found_scc': 'Найдена компонента!',
+        'done': 'Алгоритм завершён'
+    };
+    lines.push(`<span class="label">Действие:</span> <span class="value">${actionLabels[step.action] || step.action}</span>`);
+    
+    if (step.current_node !== null) {
+        lines.push(`<span class="label">Вершина:</span> <span class="value">${getNodeLabel(step.current_node, nodeLabels)}</span>`);
+    }
+    
+    if (activeEdge) {
+        const arrow = step.is_transposed_edge ? '⇇' : '→';
+        lines.push(`<span class="label">Ребро ${arrow}:</span> <span class="value">${getNodeLabel(step.edge_from, nodeLabels)} → ${getNodeLabel(step.edge_to, nodeLabels)}</span>`);
+    }
+    
+    if (phase === 1 && step.finish_order.length > 0) {
+        const orderLabels = step.finish_order.slice(-5).map(n => getNodeLabel(n, nodeLabels)).join(' ← ');
+        lines.push(`<span class="label">Завершены (последние):</span> <span class="value">[${orderLabels}]</span>`);
+    }
+    
+    if (phase === 3 && step.processing_order.length > 0) {
+        const orderLabels = step.processing_order.slice(0, 5).map(n => getNodeLabel(n, nodeLabels)).join(' → ');
+        lines.push(`<span class="label">Порядок обработки:</span> <span class="value">[${orderLabels}...]</span>`);
+    }
+    
+    if (step.current_scc?.length > 0) {
+        lines.push(`<span class="label">SCC найдена:</span> <span class="value">{${step.current_scc.map(n => getNodeLabel(n, nodeLabels)).join(', ')}}</span>`);
+    }
+    
+    if (step.completed_sccs?.length > 0) {
+        const all = step.completed_sccs.map((scc, i) => {
+            const color = SCC_PALETTE[i % SCC_PALETTE.length];
+            return `<span style="color:${color};">■</span> {${scc.map(n => getNodeLabel(n, nodeLabels)).join(', ')}}`;
+        }).join(', ');
+        lines.push(`<span class="label">Все SCC:</span> <span class="value">[${all}]</span>`);
+    }
+    
     return lines.join('<br>');
 }

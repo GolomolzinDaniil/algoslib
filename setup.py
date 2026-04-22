@@ -42,6 +42,8 @@ extensions = [
             'lib/graphs/src/stalin_sort.cpp',
             'lib/graphs/src/ford_fulkerson.cpp',
             'lib/graphs/src/edmonds_karp.cpp',
+            'lib/graphs/src/tarjan.cpp',
+            'lib/graphs/src/kosaraju.cpp',
         ],
         include_dirs=[
             pybind11.get_include(),
