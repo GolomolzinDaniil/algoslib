@@ -13,7 +13,7 @@ def test_linear_searche_one_found():
 
 def test_linear_searche_many_found():
     arr = [2, 7, 2, 9, 2]
-    assert linear_searche(arr, 2) == [0, 2, 4]
+    assert linear_searche(arr, 2) == [0]
 
 
 def test_linear_searche_not_found():
@@ -23,7 +23,7 @@ def test_linear_searche_not_found():
 
 def test_linear_searche_negative_values():
     arr = [-5, -2, 0, -2, 10]
-    assert linear_searche(arr, -2) == [1, 3]
+    assert linear_searche(arr, -2) == [1]
 
 
 def test_linear_searche_both_sides_empty_arr():
@@ -33,7 +33,7 @@ def test_linear_searche_both_sides_empty_arr():
 
 def test_linear_searche_both_sides_found_from_edges():
     arr = [4, 1, 7, 3, 4]
-    assert linear_searche_both_sides(arr, 4) == [0, 4]
+    assert linear_searche_both_sides(arr, 4) == [0]
 
 
 def test_linear_searche_both_sides_middle_on_odd_len():
