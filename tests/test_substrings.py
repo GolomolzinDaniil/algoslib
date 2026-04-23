@@ -17,7 +17,6 @@ def test_empty_pattern(func):
 @pytest.mark.parametrize("func", ALGORITHMS)
 def test_empty_text(func):
     """В пустом тексте ничего не найти (возвращает npos, обычно -1)"""
-    # Приводим к int, так как size_t может быть очень большим числом
     assert int(func("", "a")) == -1
 
 @pytest.mark.parametrize("func", ALGORITHMS)
@@ -48,10 +47,9 @@ def test_full_match(func):
 @pytest.mark.parametrize("func", ALGORITHMS)
 def test_single_char(func):
     """Поиск одного символа"""
-    assert func("banana", "n") == 2 # Возвращает индекс ПЕРВОГО вхождения
+    assert func("banana", "n") == 2
 
 @pytest.mark.parametrize("func", ALGORITHMS)
 def test_overlapping(func):
     """Перекрывающиеся паттерны (возвращает первый)"""
-    # "aaa" содержит "aa" по индексу 0
     assert func("aaa", "aa") == 0

@@ -68,6 +68,22 @@ extensions = [
         extra_compile_args=compile_flags,
         # extra_link_args=
     ),
+
+    # substrings
+    Extension(
+        name='algoslib.substrings.sub_substrings',
+        sources=[
+            'algoslib/substrings/sub_substrings.cpp',
+            'lib/substrings/src/knuth_morris_pratt.cpp'
+        ],
+        include_dirs=[
+            pybind11.get_include(),
+            'lib/substrings/include/'
+        ],
+        language='c++',
+        extra_compile_args=compile_flags,
+        # extra_link_args=
+    )
 ]
 
 setup(
@@ -77,6 +93,7 @@ setup(
     package_data={
         'algoslib.sorting': ['sub_sorting.pyi'],
         'algoslib.graphs' : ['sub_graphs.pyi'],
-        'algoslib.searches' : ['sub_searches.pyi']
+        'algoslib.searches' : ['sub_searches.pyi'],
+        'algoslib.substrings' : ['sub_substrings.pyi']
     },
 )

@@ -11,7 +11,9 @@ from algoslib.sorting.sub_sorting import (
 )    
 
 
-ALGORITHMS = [bubble_sort, selection_sort, gnome_sort, insertion_sort, quick_sort, counting_sort]
+ALGORITHMS = (
+    bubble_sort, selection_sort, gnome_sort, insertion_sort, quick_sort, counting_sort
+)
 
 @pytest.mark.parametrize("func", ALGORITHMS)
 def test_zero_arr(func):

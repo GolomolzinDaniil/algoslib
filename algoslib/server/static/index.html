@@ -27,6 +27,10 @@
             <i data-lucide="search"></i>
             <span>Поиск</span>
         </button>
+        <button class="tab" data-tab="substrings">
+            <i data-lucide="type"></i>
+            <span>Подстроки</span>
+        </button>
     </nav>
 
     <section id="sorting" class="page active">
@@ -248,6 +252,65 @@ D E</textarea>
             </div>
         </div>
         <div id="search-status" class="status"></div>
+    </section>
+
+    <section id="substrings" class="page">
+        <div class="sorting-header" id="substring-header" style="display: block;">
+            <div class="sorting-header-title" id="substring-title">Поиск подстроки</div>
+            <div class="sorting-header-desc" id="substring-desc">Выберите алгоритм и введите данные</div>
+            <div class="sorting-header-time" id="substring-time"></div>
+            <div class="sorting-header-memory" id="substring-memory"></div>
+        </div>
+        <div class="input-panel">
+            <div class="input-row">
+                <label>Алгоритм:</label>
+                <select id="substring-algo">
+                    <option value="" disabled selected>Выберите алгоритм</option>
+                    <option value="kmp">Knuth-Morris-Pratt (KMP)</option>
+                </select>
+            </div>
+            <div class="input-row">
+                <label>Текст (макс. 15):</label>
+                <input type="text" id="substring-text" maxlength="15" value="ABABDABACDABABC" placeholder="Введите текст (до 15 симв.)">
+            </div>
+            <div class="input-row">
+                <label>Паттерн (до длины текста):</label>
+                <input type="text" id="substring-pattern" maxlength="15" value="ABABCAB" placeholder="Введите паттерн">
+            </div>
+        </div>
+        
+        <div class="viz-container">
+            <div id="substring-plot" class="substring-plot"></div>
+        </div>
+
+        <!-- Кнопки скрыты, пока не выбран алгоритм -->
+        <div class="controls" id="substring-controls" style="display:none">
+            <button class="btn" id="substring-prev">
+                <i data-lucide="skip-back"></i>
+                <span>Назад</span>
+            </button>
+            <button class="btn primary" id="substring-play">
+                <i data-lucide="play"></i>
+                <span>Старт</span>
+            </button>
+            <button class="btn" id="substring-next">
+                <span>Вперед</span>
+                <i data-lucide="skip-forward"></i>
+            </button>
+            
+            <!-- Кнопка Пример между Next и Speed -->
+            <button class="btn" id="substring-example" style="margin-left: 10px;">
+                <i data-lucide="file-code"></i>
+                <span>Пример</span>
+            </button>
+
+            <div class="speed-control">
+                <span>Скорость:</span>
+                <input type="range" id="substring-speed" min="50" max="1000" value="300" step="50">
+                <span id="substring-speed-val">300ms</span>
+            </div>
+        </div>
+        <div id="substring-status" class="status"></div>
     </section>
 
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
