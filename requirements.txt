@@ -1,5 +1,8 @@
 # Python >= 3.12.3 (ну я на таком работаю)
 
+pydantic>=2.10.6
+pydantic-settings>=2.7.1
+
 numpy>=2.4.2
 pybind11>=3.0.1
 setuptools>=80.10.2

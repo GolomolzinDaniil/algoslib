@@ -341,6 +341,7 @@ select {
     justify-content: center;
     padding: 20px;
     margin-bottom: 12px;
+    overflow-x: auto; /* Позволяет скроллить длинные строки */
 }
 
 .plot {
@@ -582,8 +583,10 @@ input[type="range"] {
     font-weight: 500;
 }
 
+/* Headers for Sorting, Search, and Substrings */
 #sorting .sorting-header,
-#searches .sorting-header {
+#searches .sorting-header,
+#substrings .sorting-header {
     width: 100%;
     max-width: 1100px;
     background: var(--surface);
@@ -596,7 +599,8 @@ input[type="range"] {
 }
 
 #sorting .sorting-header-title,
-#searches .sorting-header-title {
+#searches .sorting-header-title,
+#substrings .sorting-header-title {
     font-weight: 500;
     font-size: 30px;
     color: var(--accent);
@@ -605,7 +609,8 @@ input[type="range"] {
 }
 
 #sorting .sorting-header-desc,
-#searches .sorting-header-desc {
+#searches .sorting-header-desc,
+#substrings .sorting-header-desc {
     font-weight: 400;
     font-size: 18px;
     color: var(--text);
@@ -616,7 +621,9 @@ input[type="range"] {
 #sorting .sorting-header-time,
 #sorting .sorting-header-memory,
 #searches .sorting-header-time,
-#searches .sorting-header-memory {
+#searches .sorting-header-memory,
+#substrings .sorting-header-time,
+#substrings .sorting-header-memory {
     font-weight: 300;
     font-size: 14px;
     color: var(--text);

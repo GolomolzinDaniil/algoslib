@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 
-from .routers import sorting, graphs, searches
+from .routers import sorting, graphs, searches, substrings
 
 app = FastAPI(title="algoslib")
 
@@ -21,6 +21,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(sorting.router, prefix="/api/sorting")
 app.include_router(graphs.router, prefix="/api/graphs")
 app.include_router(searches.router, prefix="/api/searches")
+app.include_router(substrings.router, prefix="/api/substrings")
 
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 app.mount("/static", StaticFiles(directory=static_dir), name="static")

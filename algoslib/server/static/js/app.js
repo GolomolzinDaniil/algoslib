@@ -1,6 +1,7 @@
 import { renderSortingCells, updateSortingStep } from './sorting-viz.js';
 import { renderGraph, updateGraphStep, setSpacing, setViewScale, renderFlowGraph, updateFlowGraphStep, updateTarjanStep, updateKosarajuStep } from './graph-viz.js';
 import { renderSearchCells, updateSearchStep } from './searche-viz.js';
+import { renderSubstringViz, updateSubstringStep } from './substring-viz.js';
 
 const SORTING_META = {
     bubble: {
@@ -53,6 +54,16 @@ const SORTING_META = {
         direction: "counting"
     }
 };
+
+const SUBSTRING_META = {
+    kmp: {
+        title: "Knuth-Morris-Pratt",
+        desc: "Поиск подстроки за линейное время",
+        time: "Время: O(N + M)",
+        memory: "Память: O(M)",
+    }
+};
+
 const MAX_SORT_ITEMS = 15;
 const MAX_SORT_VISUAL_ITEMS = 15;
 const SEARCH_COLLAPSED_MAX_ROWS = 3;
@@ -80,6 +91,7 @@ const SEARCH_META = {
 document.addEventListener('DOMContentLoaded', () => {
     initSortingPage();
     initSearchPage();
+    initSubstringsPage();
     if (window.lucide) setTimeout(() => lucide.createIcons(), 100);
 });
 
@@ -140,17 +152,50 @@ function initSearchPage() {
     }
 }
 
+function initSubstringsPage() {
+    const header = document.getElementById('substring-header');
+    if (header) {
+        header.style.display = 'block';
+        document.getElementById('substring-title').textContent = 'Поиск подстроки';
+        document.getElementById('substring-desc').textContent = 'Выберите алгоритм и введите данные';
+        document.getElementById('substring-time').textContent = '';
+        document.getElementById('substring-memory').textContent = '';
+    }
+
+    const algoSelect = document.getElementById('substring-algo');
+    if (algoSelect) algoSelect.value = '';
+
+    const plot = document.getElementById('substring-plot');
+    if (plot) plot.innerHTML = '';
+
+    const status = document.getElementById('substring-status');
+    if (status) status.textContent = '';
+
+    // Скрываем кнопки, пока не выбран алгоритм
+    const controls = document.getElementById('substring-controls');
+    if (controls) controls.style.display = 'none';
+
+    stopPlayer(substringPlayer);
+    substringPlayer.steps = [];
+    substringPlayer.current = 0;
+}
+
+// --- TABS LOGIC ---
 document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         tab.classList.add('active');
-        document.getElementById(tab.dataset.tab).classList.add('active');
+        const pageId = tab.dataset.tab;
+        const page = document.getElementById(pageId);
+        if (page) page.classList.add('active');
 
-        if (tab.dataset.tab === 'sorting') {
+        if (pageId === 'sorting') {
             initSortingPage();
-        } else if (tab.dataset.tab === 'searches') {
+        } else if (pageId === 'searches') {
             initSearchPage();
+        } else if (pageId === 'substrings') {
+            initSubstringsPage();
         }
     });
 });
@@ -173,6 +218,32 @@ document.getElementById('sort-algo').addEventListener('change', (e) => {
         document.getElementById('sort-desc').textContent = 'Выберите алгоритм и введите массив';
         document.getElementById('sort-time').textContent = '';
         document.getElementById('sort-memory').textContent = '';
+    }
+});
+
+// --- SUBSTRINGS ALGO CHANGE ---
+document.getElementById('substring-algo').addEventListener('change', (e) => {
+    const algo = e.target.value;
+    resetSubstringSession();
+
+    if (algo && SUBSTRING_META[algo]) {
+        const meta = SUBSTRING_META[algo];
+        // Показываем кнопки только после выбора алгоритма
+        substringPlayer.el.controls.style.display = 'flex';
+        document.getElementById('substring-title').textContent = meta.title;
+        document.getElementById('substring-desc').textContent = meta.desc;
+        document.getElementById('substring-time').textContent = meta.time;
+        document.getElementById('substring-memory').textContent = meta.memory;
+        
+        // Сразу обновляем превью с текущими данными
+        updateSubstringPreview();
+    } else {
+        // Скрываем кнопки, если алгоритм сброшен
+        substringPlayer.el.controls.style.display = 'none';
+        document.getElementById('substring-title').textContent = 'Поиск подстроки';
+        document.getElementById('substring-desc').textContent = 'Выберите алгоритм и введите данные';
+        document.getElementById('substring-time').textContent = '';
+        document.getElementById('substring-memory').textContent = '';
     }
 });
 
@@ -199,6 +270,7 @@ function createPlayer(prefix) {
 const sortPlayer = createPlayer('sort');
 const graphPlayer = createPlayer('graph');
 const searchPlayer = createPlayer('search');
+const substringPlayer = createPlayer('substring');
 
 let graphData = { nodes: [], edges: [], algorithm: 'bfs', nodeLabels: {}, source: null, sink: null };
 let sortData = { history: [], initialArray: [], sortedArray: [] };
@@ -210,6 +282,12 @@ let searchData = {
     source: '',
     historySource: '',
 };
+let substringData = {
+    steps: [],
+    text: "",
+    pattern: ""
+};
+
 let uploadedSortData = null;
 const sortPlot = document.getElementById('sort-plot');
 const sortDataInput = document.getElementById('sort-data');
@@ -260,6 +338,17 @@ function resetSortingSession() {
     sortData = { history: [], initialArray: [], sortedArray: [] };
     if (sortPlot) sortPlot.innerHTML = '';
     if (sortPlayer.el.status) sortPlayer.el.status.textContent = '';
+}
+
+function resetSubstringSession() {
+    stopPlayer(substringPlayer);
+    substringPlayer.steps = [];
+    substringPlayer.current = 0;
+    substringData = { steps: [], text: "", pattern: "" };
+    const plot = document.getElementById('substring-plot');
+    if (plot) plot.innerHTML = '';
+    if (substringPlayer.el.status) substringPlayer.el.status.textContent = '';
+    // Кнопки остаются видимыми, если алгоритм выбран, но мы сбрасываем состояние плеера
 }
 
 function normalizeSortingHistory(history) {
@@ -1431,30 +1520,60 @@ function stopPlayer(player) {
 
 function startPlayer(player, renderFn) {
     if (!Array.isArray(player.steps) || player.steps.length === 0) return;
-    if (player.current >= player.steps.length - 1) player.current = 0;
+    
+    // Если мы уже в конце, начинаем сначала
+    if (player.current >= player.steps.length - 1) {
+        player.current = 0;
+    }
+
     player.playing = true;
     player.el.play.innerHTML = '<i data-lucide="pause"></i> <span>Пауза</span>';
     player.el.play.classList.remove('primary');
     refreshIcons();
 
+    // Сразу рендерим текущий шаг
+    (player.renderFn || renderFn)(player.current);
+
     function loop() {
+        // ПРОВЕРКА ПАУЗЫ: если playing false, выходим из цикла и меняем иконку
         if (!player.playing) {
-            stopPlayer(player);
+            player.el.play.innerHTML = '<i data-lucide="play"></i> <span>Старт</span>';
+            player.el.play.classList.add('primary');
+            refreshIcons();
             return;
         }
 
-        (player.renderFn || renderFn)(player.current);
-
+        // Если достигли конца
         if (player.current >= player.steps.length - 1) {
             stopPlayer(player);
             return;
         }
 
         player.timer = setTimeout(() => {
+            // Повторная проверка внутри таймаута на случай быстрой паузы
+            if (!player.playing) return; 
+            
             player.current++;
+            
+            // Рендерим новый шаг
+            (player.renderFn || renderFn)(player.current);
+            
+            // Проверка для подстрок: если нашли совпадение, останавливаемся и показываем результат
+            if (player === substringPlayer) {
+                const currentStep = player.steps[player.current];
+                if (currentStep && (currentStep['is_found'] || currentStep['is_full_match'])) {
+                    stopPlayer(player);
+                    // Принудительно обновляем статус, чтобы гарантировать вывод индекса
+                    const foundPos = currentStep['found_pos'] !== undefined ? currentStep['found_pos'] : currentStep['match_start_pos'];
+                    player.el.status.textContent = `✅ Индекс первого совпадения: ${foundPos}`;
+                    return;
+                }
+            }
+
             loop();
         }, player.speed);
     }
+    
     loop();
 }
 
@@ -1486,3 +1605,202 @@ function wireControls(player, renderFn) {
 }
 
 wireControls(graphPlayer, renderGraphStepAt);
+
+// --- SUBSTRINGS CONTROLS INIT ---
+substringPlayer.el.prev = document.getElementById('substring-prev');
+substringPlayer.el.play = document.getElementById('substring-play');
+substringPlayer.el.next = document.getElementById('substring-next');
+substringPlayer.el.speed = document.getElementById('substring-speed');
+substringPlayer.el.speedVal = document.getElementById('substring-speed-val');
+substringPlayer.el.controls = document.getElementById('substring-controls');
+substringPlayer.el.status = document.getElementById('substring-status');
+
+if (substringPlayer.el.speed) {
+    substringPlayer.el.speed.addEventListener('input', (e) => {
+        substringPlayer.speed = parseInt(e.target.value);
+        substringPlayer.el.speedVal.textContent = substringPlayer.speed + 'ms';
+    });
+}
+if (substringPlayer.el.prev) {
+    substringPlayer.el.prev.addEventListener('click', () => {
+        if (substringPlayer.current > 0) {
+            stopPlayer(substringPlayer);
+            substringPlayer.current--;
+            renderSubstringStep(substringPlayer.current);
+        }
+    });
+}
+if (substringPlayer.el.next) {
+    substringPlayer.el.next.addEventListener('click', () => {
+        if (substringPlayer.current < substringPlayer.steps.length - 1) {
+            substringPlayer.current++;
+            renderSubstringStep(substringPlayer.current);
+        } else {
+            stopPlayer(substringPlayer);
+        }
+    });
+}
+if (substringPlayer.el.play) {
+    substringPlayer.el.play.addEventListener('click', async () => {
+        const algo = document.getElementById('substring-algo').value;
+        if (!algo) {
+            substringPlayer.el.status.textContent = 'Выберите алгоритм';
+            return;
+        }
+
+        if (substringPlayer.playing) {
+            stopPlayer(substringPlayer);
+            return;
+        }
+
+        const text = document.getElementById('substring-text').value;
+        const pattern = document.getElementById('substring-pattern').value;
+        const shouldReload =
+            substringPlayer.steps.length === 0 ||
+            substringData.text !== text ||
+            substringData.pattern !== pattern;
+
+        if (shouldReload) {
+            substringPlayer.el.status.textContent = 'Загрузка...';
+            try {
+                await loadSubstringData();
+            } catch (e) {
+                substringPlayer.el.status.textContent = `Ошибка: ${e.message}`;
+                return;
+            }
+        }
+
+        startPlayer(substringPlayer, renderSubstringStep);
+    });
+}
+
+// Обработчик кнопки "Пример" для подстрок
+const substringExampleBtn = document.getElementById('substring-example');
+if (substringExampleBtn) {
+    substringExampleBtn.addEventListener('click', () => {
+        const textInput = document.getElementById('substring-text');
+        const patternInput = document.getElementById('substring-pattern');
+        
+        // Значения по умолчанию (укорочены до 15 символов)
+        textInput.value = "ABABDABACDABABC";
+        patternInput.value = "ABABC";
+        
+        // Сброс визуализации и триггер обновления превью
+        resetSubstringSession();
+        
+        // Если алгоритм выбран, сразу показываем превью
+        const algo = document.getElementById('substring-algo').value;
+        if (algo) {
+             setTimeout(() => {
+                 updateSubstringPreview();
+             }, 10);
+        }
+        
+        if (window.lucide) lucide.createIcons();
+    });
+}
+
+// Функция для мгновенного обновления превью при изменении текста
+async function updateSubstringPreview() {
+    const algo = document.getElementById('substring-algo').value;
+    if (!algo) return;
+
+    const text = document.getElementById('substring-text').value;
+    const pattern = document.getElementById('substring-pattern').value;
+
+    // Показываем начальное состояние (шаг 0) или пустую визуализацию
+    // Чтобы не спамить сервер при каждом нажатии клавиши, можно сделать debounce, 
+    // но для простоты вызовем загрузку данных и сбросим плеер на шаг 0
+    
+    try {
+        // Загружаем данные silently
+        const res = await fetch(`/api/substrings/kmp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, pattern }),
+        });
+        if (!res.ok) return;
+        
+        const result = await res.json();
+        substringData = result;
+        substringPlayer.steps = result.steps;
+        substringPlayer.current = 0;
+        
+        // Обновляем визуализацию на первом шаге
+        if (substringData.steps.length > 0) {
+            renderSubstringStep(0);
+        } else {
+            renderSubstringViz(document.getElementById('substring-plot'), text, pattern, null);
+        }
+        substringPlayer.el.status.textContent = 'Готово к запуску';
+    } catch (e) {
+        // Игнорируем ошибки при превью
+    }
+}
+
+// Слушатели изменений в полях ввода
+const substringTextInput = document.getElementById('substring-text');
+const substringPatternInput = document.getElementById('substring-pattern');
+
+if (substringTextInput) {
+    substringTextInput.addEventListener('input', () => {
+        // Динамическое ограничение длины паттерна длиной текста
+        const len = substringTextInput.value.length;
+        substringPatternInput.maxLength = Math.max(1, len);
+        
+        // Если текущий паттерн длиннее нового текста, обрезаем его
+        if (substringPatternInput.value.length > len) {
+            substringPatternInput.value = substringPatternInput.value.substring(0, len);
+        }
+        
+        updateSubstringPreview();
+    });
+}
+
+if (substringPatternInput) {
+    substringPatternInput.addEventListener('input', () => {
+        updateSubstringPreview();
+    });
+}
+
+async function loadSubstringData() {
+    const algo = document.getElementById('substring-algo').value;
+    const text = document.getElementById('substring-text').value;
+    const pattern = document.getElementById('substring-pattern').value;
+    
+    if (!text && !pattern) throw new Error("Введите текст и паттерн");
+    
+    // Пока только KMP
+    const res = await fetch(`/api/substrings/kmp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, pattern }),
+    });
+    if (!res.ok) {
+        let msg = res.statusText;
+        try { const j = await res.json(); msg = j.detail || msg; } catch { }
+        throw new Error(msg);
+    }
+    const result = await res.json();
+    substringData = result;
+    substringPlayer.steps = result.steps;
+    substringPlayer.current = 0;
+    // Кнопки всегда видны, но статус обновляем
+    if (substringData.steps.length === 0) {
+        renderSubstringViz(document.getElementById('substring-plot'), substringData.text, substringData.pattern, null);
+        substringPlayer.el.status.textContent = 'Нет шагов';
+        return;
+    }
+    renderSubstringStep(0);
+}
+
+function renderSubstringStep(idx) {
+    const msg = updateSubstringStep(
+        document.getElementById('substring-plot'),
+        substringData.steps,
+        substringData.text,
+        substringData.pattern,
+        idx
+    );
+    substringPlayer.el.status.textContent = msg;
+}
