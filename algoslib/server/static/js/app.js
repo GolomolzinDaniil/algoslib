@@ -1648,20 +1648,29 @@ if (substringPlayer.el.play) {
             return;
         }
 
-        // Всегда перезагружаем данные при нажатии Play, чтобы учесть изменения в полях
-        substringPlayer.el.status.textContent = 'Загрузка...';
-        try {
-            await loadSubstringData();
-        } catch (e) {
-            substringPlayer.el.status.textContent = `Ошибка: ${e.message}`;
+        if (substringPlayer.playing) {
+            stopPlayer(substringPlayer);
             return;
         }
 
-        if (substringPlayer.playing) {
-            stopPlayer(substringPlayer);
-        } else {
-            startPlayer(substringPlayer, renderSubstringStep);
+        const text = document.getElementById('substring-text').value;
+        const pattern = document.getElementById('substring-pattern').value;
+        const shouldReload =
+            substringPlayer.steps.length === 0 ||
+            substringData.text !== text ||
+            substringData.pattern !== pattern;
+
+        if (shouldReload) {
+            substringPlayer.el.status.textContent = 'Загрузка...';
+            try {
+                await loadSubstringData();
+            } catch (e) {
+                substringPlayer.el.status.textContent = `Ошибка: ${e.message}`;
+                return;
+            }
         }
+
+        startPlayer(substringPlayer, renderSubstringStep);
     });
 }
 
@@ -1674,7 +1683,7 @@ if (substringExampleBtn) {
         
         // Значения по умолчанию (укорочены до 15 символов)
         textInput.value = "ABABDABACDABABC";
-        patternInput.value = "ABABCAB";
+        patternInput.value = "ABABC";
         
         // Сброс визуализации и триггер обновления превью
         resetSubstringSession();
