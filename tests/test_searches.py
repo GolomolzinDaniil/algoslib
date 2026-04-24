@@ -1,4 +1,11 @@
-from algoslib.searches.sub_searches import linear_searche, linear_searche_both_sides, linear_searche_both_sides_h
+from algoslib.searches.sub_searches import (
+    linear_searche,
+    linear_searche_both_sides,
+    linear_searche_both_sides_h,
+    binary_search,
+    binary_search_h,
+    binary_search_sorted,
+)
 
 
 def test_linear_searche_empty_arr():
@@ -49,3 +56,27 @@ def test_linear_searche_both_sides_history_even_len():
 def test_linear_searche_both_sides_history_odd_len():
     arr = [1, 2, 3, 2, 1]
     assert linear_searche_both_sides_h(arr, 5) == [(0, 4), (1, 3), (2, 2)]
+
+
+def test_binary_search_sorted():
+    arr = [5, 1, 4, 2, 3]
+    assert binary_search_sorted(arr) == [1, 2, 3, 4, 5]
+
+
+def test_binary_search_found_in_sorted_result():
+    arr = [5, 1, 4, 2, 3]
+    assert binary_search(arr, 4) == [3]
+
+
+def test_binary_search_not_found():
+    arr = [5, 1, 4, 2, 3]
+    assert binary_search(arr, 9) == []
+
+
+def test_binary_search_history_contains_comparison_details():
+    arr = [5, 1, 4, 2, 3]
+    history = binary_search_h(arr, 4)
+    assert history == [
+        (0, 4, 2, 3, 4, False),
+        (3, 4, 3, 4, 4, True),
+    ]

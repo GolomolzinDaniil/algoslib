@@ -86,6 +86,12 @@ const SEARCH_META = {
         time: "Время: O(n)",
         memory: "Память: О(1)",
     },
+    binary_search: {
+        title: "Binary Search",
+        desc: "Сортирует массив (bubble sort) и сравнивает середину диапазона с целью",
+        time: "Время: O(n² + log n)",
+        memory: "Память: О(n)",
+    },
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -937,7 +943,70 @@ function buildSearchSteps(data, resultIndexes, historyIndexes = []) {
     const steps = [];
 
     const rawHistory = Array.isArray(historyIndexes) ? historyIndexes : [];
+    const hasObjectHistory = rawHistory.some(
+        (item) => item && typeof item === 'object' && !Array.isArray(item)
+    );
     const hasPairHistory = rawHistory.some((item) => Array.isArray(item));
+
+    if (hasObjectHistory) {
+        const objectHistory = rawHistory
+            .map((item) => {
+                if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+
+                const mid = Number(item.mid_index);
+                const left = Number(item.left_index);
+                const right = Number(item.right_index);
+                const comparedValue = Number(item.compared_value);
+                const targetValue = Number(item.target_value);
+
+                if (!Number.isInteger(mid) || mid < 0 || mid >= safeData.length) return null;
+
+                const normalizedLeft = Number.isInteger(left)
+                    ? Math.max(0, Math.min(left, safeData.length - 1))
+                    : 0;
+                const normalizedRight = Number.isInteger(right)
+                    ? Math.max(0, Math.min(right, safeData.length - 1))
+                    : safeData.length - 1;
+
+                return {
+                    mid,
+                    left: normalizedLeft,
+                    right: normalizedRight,
+                    comparedValue: Number.isFinite(comparedValue) ? comparedValue : safeData[mid],
+                    targetValue: Number.isFinite(targetValue) ? targetValue : null,
+                    isMatch: Boolean(item.is_match),
+                };
+            })
+            .filter((item) => item !== null);
+
+        if (objectHistory.length === 0) {
+            return appendFinalSearchResultStep([], safeResultIndexes);
+        }
+
+        for (const stepData of objectHistory) {
+            const idx = stepData.mid;
+            const isMatch = stepData.isMatch || resultSet.has(idx);
+
+            if (isMatch && !foundSet.has(idx)) {
+                foundSet.add(idx);
+                foundSoFar.push(idx);
+            }
+
+            steps.push({
+                current_indices: [idx],
+                current_index: idx,
+                checked_until: stepData.right,
+                found_indices: [...foundSoFar],
+                is_match: isMatch,
+                left_index: stepData.left,
+                right_index: stepData.right,
+                compared_value: stepData.comparedValue,
+                target_value: stepData.targetValue,
+            });
+        }
+
+        return appendFinalSearchResultStep(steps, safeResultIndexes);
+    }
 
     if (hasPairHistory) {
         const pairHistory = rawHistory
@@ -1005,13 +1074,14 @@ function buildSearchSteps(data, resultIndexes, historyIndexes = []) {
 }
 
 function applySearchResult(apiResult, data, target) {
+    const visualData = Array.isArray(apiResult?.visual_data) ? apiResult.visual_data : data;
     const resultIndexes = Array.isArray(apiResult?.result) ? apiResult.result : [];
     const historyIndexes = Array.isArray(apiResult?.history) ? apiResult.history : [];
-    const steps = buildSearchSteps(data, resultIndexes, historyIndexes);
+    const steps = buildSearchSteps(visualData, resultIndexes, historyIndexes);
 
     searchData = {
         steps,
-        initialArray: [...data],
+        initialArray: [...visualData],
         result: [...resultIndexes],
         target,
         source: apiResult?.source || 'cpp',
