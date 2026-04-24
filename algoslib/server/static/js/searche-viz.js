@@ -78,6 +78,17 @@ export function updateSearchStep(
     let inspectLabel = 'ожидание шага';
     if (currentIndices.length === 0 && foundIndexes.length > 0) {
         inspectLabel = `результат: индекс ${foundIndexes.join(', ')}`;
+    } else if (
+        currentIndices.length === 1 &&
+        Number.isInteger(step.left_index) &&
+        Number.isInteger(step.right_index)
+    ) {
+        const idx = currentIndices[0];
+        const comparedValue = step.compared_value ?? safeData[idx];
+        const targetValue = step.target_value ?? '?';
+        inspectLabel =
+            `диапазон [${step.left_index}, ${step.right_index}], ` +
+            `mid=${idx} (значение ${comparedValue}), цель ${targetValue}`;
     } else if (currentIndices.length === 1) {
         inspectLabel = `проверяем индекс ${currentIndices[0]} (значение ${currentValues[0]})`;
     } else if (currentIndices.length > 1) {
