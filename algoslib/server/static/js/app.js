@@ -61,6 +61,12 @@ const SUBSTRING_META = {
         desc: "Поиск подстроки за линейное время",
         time: "Время: O(N + M)",
         memory: "Память: O(M)",
+    },
+    boyer_moore: {
+        title: "Boyer-Moore",
+        desc: "Сравнивает паттерн справа налево и сдвигает его по правилу плохого символа",
+        time: "Время: O(NM) в худшем, быстрее на практике",
+        memory: "Память: O(Σ)",
     }
 };
 
@@ -1752,14 +1758,19 @@ if (substringExampleBtn) {
         const patternInput = document.getElementById('substring-pattern');
         
         // Значения по умолчанию (укорочены до 15 символов)
-        textInput.value = "ABABDABACDABABC";
-        patternInput.value = "ABABC";
+        const algo = document.getElementById('substring-algo').value;
+        if (algo === 'boyer_moore') {
+            textInput.value = "HEREISASIMPLE";
+            patternInput.value = "SIMPLE";
+        } else {
+            textInput.value = "ABABDABACDABABC";
+            patternInput.value = "ABABC";
+        }
         
         // Сброс визуализации и триггер обновления превью
         resetSubstringSession();
         
         // Если алгоритм выбран, сразу показываем превью
-        const algo = document.getElementById('substring-algo').value;
         if (algo) {
              setTimeout(() => {
                  updateSubstringPreview();
@@ -1784,7 +1795,7 @@ async function updateSubstringPreview() {
     
     try {
         // Загружаем данные silently
-        const res = await fetch(`/api/substrings/kmp`, {
+        const res = await fetch(`/api/substrings/${algo}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text, pattern }),
@@ -1840,8 +1851,7 @@ async function loadSubstringData() {
     
     if (!text && !pattern) throw new Error("Введите текст и паттерн");
     
-    // Пока только KMP
-    const res = await fetch(`/api/substrings/kmp`, {
+    const res = await fetch(`/api/substrings/${algo}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, pattern }),
