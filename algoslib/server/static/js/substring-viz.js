@@ -1,3 +1,48 @@
+const SUBSTRING_CELL_STEP = 58;
+
+function toInteger(value, fallback = -1) {
+    const index = Number(value);
+    return Number.isInteger(index) ? index : fallback;
+}
+
+function getStepTextIndex(step) {
+    return toInteger(step?.text_idx !== undefined ? step.text_idx : step?.text_index);
+}
+
+function getStepPatternIndex(step) {
+    return toInteger(step?.pattern_idx !== undefined ? step.pattern_idx : step?.pattern_index);
+}
+
+function getStepFoundPos(step, textLength) {
+    const rawFoundPos = step?.found_pos !== undefined ? step.found_pos : step?.match_start_pos;
+    const foundPos = toInteger(rawFoundPos);
+    return foundPos >= 0 && foundPos <= textLength ? foundPos : -1;
+}
+
+function isStepFound(step, textLength) {
+    return Boolean(step?.is_found || step?.is_full_match) && getStepFoundPos(step, textLength) >= 0;
+}
+
+function getPatternStartOffset(step, textLength, patternLength) {
+    if (!step || typeof step !== 'object' || patternLength <= 0) return 0;
+
+    const foundPos = getStepFoundPos(step, textLength);
+    let offset = isStepFound(step, textLength) ? foundPos : 0;
+    const textIdx = getStepTextIndex(step);
+    const patternIdx = getStepPatternIndex(step);
+
+    if (!isStepFound(step, textLength)) {
+        if (textIdx >= 0 && patternIdx >= 0) {
+            offset = textIdx - patternIdx;
+        } else if (textIdx >= 0) {
+            offset = textIdx;
+        }
+    }
+
+    const maxOffset = Math.max(0, textLength - 1);
+    return Math.max(0, Math.min(offset, maxOffset));
+}
+
 export function renderSubstringViz(container, text, pattern, step) {
     if (!container) return;
     container.innerHTML = '';
@@ -14,6 +59,7 @@ export function renderSubstringViz(container, text, pattern, step) {
     wrapper.style.position = 'relative';
     wrapper.style.minHeight = '100px';
     wrapper.style.padding = '10px 0';
+    wrapper.style.maxWidth = '100%';
 
     // --- ROW 1: PATTERN (Top) ---
     if (safePattern.length > 0) {
@@ -21,21 +67,12 @@ export function renderSubstringViz(container, text, pattern, step) {
         patternRow.style.display = 'flex';
         patternRow.style.marginBottom = '4px';
         
-        let startOffset = 0;
-        if (step && typeof step === 'object') {
-            const tIdx = step['text_idx'] !== undefined ? step['text_idx'] : step['text_index'];
-            const pIdx = step['pattern_idx'] !== undefined ? step['pattern_idx'] : step['pattern_index'];
-            
-            if (tIdx >= 0 && pIdx >= 0) {
-                startOffset = tIdx - pIdx;
-            } else if (tIdx >= 0) {
-                startOffset = tIdx;
-            }
-        }
+        const startOffset = getPatternStartOffset(step, safeText.length, safePattern.length);
 
         if (startOffset > 0) {
             const spacer = document.createElement('div');
-            spacer.style.width = `${startOffset * 58}px`; 
+            spacer.style.width = `${startOffset * SUBSTRING_CELL_STEP}px`;
+            spacer.style.flex = '0 0 auto';
             patternRow.appendChild(spacer);
         }
 
@@ -56,9 +93,9 @@ export function renderSubstringViz(container, text, pattern, step) {
             charBox.textContent = safePattern[i];
 
             if (step && typeof step === 'object') {
-                const pIdx = step['pattern_idx'] !== undefined ? step['pattern_idx'] : step['pattern_index'];
+                const pIdx = getStepPatternIndex(step);
                 const isMatch = step['is_match'];
-                const isFound = step['is_found'] || step['is_full_match'];
+                const isFound = isStepFound(step, safeText.length);
 
                 if (pIdx === i) {
                      if (isMatch) {
@@ -105,10 +142,10 @@ export function renderSubstringViz(container, text, pattern, step) {
         charBox.textContent = safeText[i];
         
         if (step && typeof step === 'object') {
-            const tIdx = step['text_idx'] !== undefined ? step['text_idx'] : step['text_index'];
+            const tIdx = getStepTextIndex(step);
             const isMatch = step['is_match'];
-            const isFound = step['is_found'] || step['is_full_match'];
-            const foundPos = step['found_pos'] !== undefined ? step['found_pos'] : step['match_start_pos'];
+            const isFound = isStepFound(step, safeText.length);
+            const foundPos = getStepFoundPos(step, safeText.length);
 
             if (tIdx === i) {
                 if (isMatch) {
@@ -141,8 +178,10 @@ export function renderSubstringViz(container, text, pattern, step) {
 export function updateSubstringStep(container, steps, text, pattern, stepIndex) {
     const safeSteps = Array.isArray(steps) ? steps : [];
     const step = safeSteps[stepIndex] || {};
+    const safeText = text || "";
+    const safePattern = pattern || "";
     
-    renderSubstringViz(container, text, pattern, step);
+    renderSubstringViz(container, safeText, safePattern, step);
     
     const total = safeSteps.length;
     const current = stepIndex + 1;
@@ -150,19 +189,22 @@ export function updateSubstringStep(container, steps, text, pattern, stepIndex) 
     let msg = `Шаг ${current} / ${total}`;
     
     if (step && typeof step === 'object') {
-        const isFound = step['is_found'] || step['is_full_match'];
-        const foundPos = step['found_pos'] !== undefined ? step['found_pos'] : step['match_start_pos'];
-        const tIdx = step['text_idx'] !== undefined ? step['text_idx'] : step['text_index'];
-        const pIdx = step['pattern_idx'] !== undefined ? step['pattern_idx'] : step['pattern_index'];
+        const isFound = isStepFound(step, safeText.length);
+        const foundPos = getStepFoundPos(step, safeText.length);
+        const tIdx = getStepTextIndex(step);
+        const pIdx = getStepPatternIndex(step);
 
         if (isFound) {
             // Если найдено, приоритет отдается сообщению об успехе
             msg = `✅ Индекс первого совпадения: ${foundPos}`;
         } else if (tIdx >= 0 && pIdx >= 0) {
-            const tChar = text[tIdx] || '?';
-            const pChar = pattern[pIdx] || '?';
+            const tChar = safeText[tIdx] || '?';
+            const pChar = safePattern[pIdx] || '?';
             msg += ` | T[${tIdx}]='${tChar}' vs P[${pIdx}]='${pChar}'`;
             msg += step['is_match'] ? " (совпали)" : " (не совпали)";
+            if (!step['is_match'] && step['is_backtrack'] && Number(step['lps_value']) > 0) {
+                msg += ` | сдвиг: ${step['lps_value']}`;
+            }
         } else if (current === total && !isFound) {
              // Если шаги кончились, а совпадения нет
              msg = "❌ Совпадений не найдено";

@@ -74,7 +74,8 @@ extensions = [
         name='algoslib.substrings.sub_substrings',
         sources=[
             'algoslib/substrings/sub_substrings.cpp',
-            'lib/substrings/src/knuth_morris_pratt.cpp'
+            'lib/substrings/src/knuth_morris_pratt.cpp',
+            'lib/substrings/src/boyer_moore.cpp'
         ],
         include_dirs=[
             pybind11.get_include(),
