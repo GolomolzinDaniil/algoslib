@@ -459,9 +459,9 @@ def test_ford_fulkerson_step_type():
     g = Flow_Graph()
     g.add_edge(0, 1, 10.0)
     g.add_edge(1, 2, 10.0)
-    
+
     result = ford_fulkerson(g, 0, 2)
-    
+
     assert all(isinstance(s, FordFulkerson_Step) for s in result.history)
 
 def test_oriented_graph_creation():
@@ -480,6 +480,249 @@ def test_oriented_graph_directed_edges():
     # 1 -> 0 НЕ существует
     neighbors_1 = g.get_neighbors(1)
     assert 0 not in neighbors_1
+
+
+# ================= Тесты для алгоритма Хирхольцера =================
+
+def test_hierholzer_step_type():
+    """Проверка типа возвращаемых шагов."""
+    g = Graph()
+    g.add_edge(0, 1)
+    g.add_edge(1, 2)
+    g.add_edge(2, 0)
+    steps = hierholzer(g)
+    assert all(isinstance(s, Hierholzer_Step) for s in steps)
+
+
+def test_hierholzer_simple_circuit():
+    """K3 (треугольник) — все степени чётные, должен быть эйлеров цикл."""
+    g = Graph()
+    g.add_edge(0, 1)
+    g.add_edge(1, 2)
+    g.add_edge(2, 0)
+
+    steps = hierholzer(g)
+    last = steps[-1]
+
+    assert last.euler_exists
+    assert last.is_circuit
+    # Цикл проходит по 3 рёбрам => 4 вершины в последовательности (start == end)
+    assert len(last.circuit) == 4
+    assert last.circuit[0] == last.circuit[-1]
+
+
+def test_hierholzer_eulerian_path():
+    """Путь 0-1-2-3 — две вершины (0 и 3) нечётной степени, должен быть эйлеров путь."""
+    g = Graph()
+    g.add_edge(0, 1)
+    g.add_edge(1, 2)
+    g.add_edge(2, 3)
+
+    steps = hierholzer(g)
+    last = steps[-1]
+
+    assert last.euler_exists
+    assert not last.is_circuit
+    assert last.circuit[0] != last.circuit[-1]
+    assert len(last.circuit) == 4  # 3 ребра => 4 вершины
+    # Стартуем из вершины нечётной степени
+    assert last.circuit[0] in (0, 3)
+
+
+def test_hierholzer_no_path():
+    """Граф с >2 вершинами нечётной степени — эйлерова пути нет."""
+    g = Graph()
+    # Звезда K_{1,3}: вершина 0 степени 3 (нечёт), 1,2,3 степени 1 (нечёт)
+    g.add_edge(0, 1)
+    g.add_edge(0, 2)
+    g.add_edge(0, 3)
+
+    steps = hierholzer(g)
+    last = steps[-1]
+
+    assert not last.euler_exists
+    assert last.action == "no_path"
+
+
+def test_hierholzer_uses_each_edge_once():
+    """Каждое ребро должно быть пройдено ровно один раз."""
+    g = Graph()
+    edges = [(0, 1), (1, 2), (2, 0), (0, 3), (3, 4), (4, 0)]
+    for u, v in edges:
+        g.add_edge(u, v)
+
+    steps = hierholzer(g)
+    circuit = steps[-1].circuit
+
+    assert steps[-1].euler_exists
+    # Подсчитываем рёбра пройденные циклом
+    used = []
+    for i in range(len(circuit) - 1):
+        u, v = circuit[i], circuit[i + 1]
+        used.append(tuple(sorted((u, v))))
+
+    expected = sorted(tuple(sorted(e)) for e in edges)
+    assert sorted(used) == expected
+
+
+def test_hierholzer_history_actions():
+    """История должна содержать корректные типы действий."""
+    g = Graph()
+    g.add_edge(0, 1)
+    g.add_edge(1, 2)
+    g.add_edge(2, 0)
+
+    steps = hierholzer(g)
+    actions = {s.action for s in steps}
+
+    assert "init" in actions
+    assert "push" in actions
+    assert "pop" in actions
+    assert steps[-1].action == "done"
+
+
+def test_hierholzer_remaining_edges_decrease():
+    """Количество непройденных рёбер не должно возрастать по ходу алгоритма."""
+    g = Graph()
+    g.add_edge(0, 1)
+    g.add_edge(1, 2)
+    g.add_edge(2, 3)
+    g.add_edge(3, 0)
+
+    steps = hierholzer(g)
+    counts = [len(s.remaining_edges) for s in steps]
+    for i in range(1, len(counts)):
+        assert counts[i] <= counts[i - 1]
+    # В конце все рёбра пройдены
+    assert counts[-1] == 0
+
+
+# ================= Тесты для Backtracking-Hamiltonian =================
+
+def test_hamiltonian_step_type():
+    """Проверка типа возвращаемых шагов."""
+    g = Graph()
+    g.add_edge(0, 1)
+    g.add_edge(1, 2)
+    steps = hamiltonian_backtracking(g, 0, False)
+    assert all(isinstance(s, Hamiltonian_Step) for s in steps)
+
+
+def test_hamiltonian_path_simple():
+    """Линейный путь 0-1-2: гамильтонов путь существует."""
+    g = Graph()
+    g.add_edge(0, 1)
+    g.add_edge(1, 2)
+
+    steps = hamiltonian_backtracking(g, 0, False)
+    last = steps[-1]
+
+    assert last.action == "found"
+    assert last.found
+    assert last.path == [0, 1, 2]
+
+
+def test_hamiltonian_cycle_in_complete_graph():
+    """K4 — гамильтонов цикл всегда существует."""
+    g = Graph()
+    for u, v in [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)]:
+        g.add_edge(u, v)
+
+    steps = hamiltonian_backtracking(g, 0, True)
+    last = steps[-1]
+
+    assert last.action == "found"
+    assert last.path[0] == last.path[-1] == 0
+    # Длина цикла: |V| + 1 (возврат в start)
+    assert len(last.path) == 5
+    # Каждая вершина (кроме start, который дублируется в конце) встречается один раз
+    assert sorted(last.path[:-1]) == [0, 1, 2, 3]
+
+
+def test_hamiltonian_no_path_in_disconnected():
+    """Несвязный граф — гамильтонов путь невозможен."""
+    g = Graph()
+    g.add_edge(0, 1)
+    g.add_edge(2, 3)  # отдельная компонента
+
+    steps = hamiltonian_backtracking(g, 0, False)
+    last = steps[-1]
+
+    assert last.action == "fail"
+    assert not last.found
+
+
+def test_hamiltonian_no_cycle_in_path_graph():
+    """Граф-путь 0-1-2-3 — гамильтонов путь есть, но цикла нет."""
+    g = Graph()
+    g.add_edge(0, 1)
+    g.add_edge(1, 2)
+    g.add_edge(2, 3)
+
+    # Путь существует
+    path_steps = hamiltonian_backtracking(g, 0, False)
+    assert path_steps[-1].action == "found"
+    assert path_steps[-1].path == [0, 1, 2, 3]
+
+    # Цикла не существует
+    cycle_steps = hamiltonian_backtracking(g, 0, True)
+    assert cycle_steps[-1].action == "fail"
+
+
+def test_hamiltonian_invalid_start():
+    """Несуществующая стартовая вершина должна выкидывать исключение."""
+    g = Graph()
+    g.add_edge(0, 1)
+    try:
+        hamiltonian_backtracking(g, 99, False)
+        assert False, "должно было выброситься исключение"
+    except Exception:
+        pass
+
+
+def test_hamiltonian_history_has_visit_and_backtrack():
+    """История должна содержать обращения 'visit' и 'backtrack'."""
+    # K4 без ребра (0,3): первый путь 0→1→2→3 нельзя замкнуть в цикл (нет 3-0),
+    # требуется откат и попытка 0→1→3→2 → возврат в 0.
+    g = Graph()
+    g.add_edge(0, 1)
+    g.add_edge(0, 2)
+    g.add_edge(1, 2)
+    g.add_edge(1, 3)
+    g.add_edge(2, 3)
+
+    steps = hamiltonian_backtracking(g, 0, True)
+    actions = [s.action for s in steps]
+
+    assert "init" in actions
+    assert "visit" in actions
+    assert "backtrack" in actions
+    assert steps[-1].action == "found"
+
+
+def test_hamiltonian_path_visits_all_vertices():
+    """Найденный путь должен содержать каждую вершину ровно один раз."""
+    g = Graph()
+    for u, v in [(0, 1), (1, 2), (2, 3), (3, 4), (0, 4), (1, 3)]:
+        g.add_edge(u, v)
+
+    steps = hamiltonian_backtracking(g, 0, False)
+    last = steps[-1]
+
+    assert last.action == "found"
+    assert sorted(last.path) == [0, 1, 2, 3, 4]
+
+
+def test_hamiltonian_depth_matches_path_length():
+    """depth должен совпадать с длиной текущего path на каждом шаге."""
+    g = Graph()
+    g.add_edge(0, 1)
+    g.add_edge(1, 2)
+    g.add_edge(2, 3)
+
+    steps = hamiltonian_backtracking(g, 0, False)
+    for s in steps:
+        assert s.depth == len(s.path)
 
 
 def test_tarjan_simple_cycle():

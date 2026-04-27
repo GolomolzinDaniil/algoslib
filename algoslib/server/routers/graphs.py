@@ -47,6 +47,16 @@ class StalinSortRequest(BaseModel):
     edges: list[list[str]]
 
 
+class HierholzerRequest(BaseModel):
+    edges: list[list[str]]
+
+
+class HamiltonianRequest(BaseModel):
+    edges: list[list[str]]
+    start_node: str
+    find_cycle: bool = False
+
+
 def _normalize_label(value: str) -> str:
     label = str(value).strip()
     if not label:
@@ -509,6 +519,110 @@ async def run_edmonds_karp(req: EdmondsKarpRequest):
             content={"detail": str(e), "error_type": type(e).__name__}
         )
     
+@router.post("/hierholzer")
+async def run_hierholzer(req: HierholzerRequest):
+    try:
+        from algoslib.graphs import Graph, hierholzer
+
+        if hierholzer is None:
+            raise HTTPException(
+                status_code=501,
+                detail="Hierholzer недоступен. Пересоберите sub_graphs.",
+            )
+
+        label_to_id, node_labels = _build_label_maps_no_start(req.edges)
+        parsed_edges = _parse_unweighted_edges(req.edges, label_to_id)
+
+        graph = Graph()
+        nodes = set()
+        for u, v in parsed_edges:
+            graph.add_edge(u, v)
+            nodes.add(u)
+            nodes.add(v)
+
+        steps = hierholzer(graph)
+
+        result_steps = []
+        for step in steps:
+            result_steps.append({
+                "current_node": int(step.current_node),
+                "action": step.action,
+                "stack": [int(x) for x in step.stack],
+                "circuit": [int(x) for x in step.circuit],
+                "remaining_edges": [[int(e[0]), int(e[1])] for e in step.remaining_edges],
+                "euler_exists": bool(step.euler_exists),
+                "is_circuit": bool(step.is_circuit),
+            })
+
+        return {
+            "steps": result_steps,
+            "edges": parsed_edges,
+            "nodes": sorted(nodes),
+            "node_labels": node_labels,
+        }
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
+@router.post("/hamiltonian")
+async def run_hamiltonian(req: HamiltonianRequest):
+    try:
+        from algoslib.graphs import Graph, hamiltonian_backtracking
+
+        if hamiltonian_backtracking is None:
+            raise HTTPException(
+                status_code=501,
+                detail="Hamiltonian Backtracking недоступен. Пересоберите sub_graphs.",
+            )
+
+        label_to_id, node_labels, start_label = _build_label_maps(req.edges, req.start_node)
+        parsed_edges = _parse_unweighted_edges(req.edges, label_to_id)
+
+        graph = Graph()
+        nodes = set()
+        for u, v in parsed_edges:
+            graph.add_edge(u, v)
+            nodes.add(u)
+            nodes.add(v)
+
+        steps = hamiltonian_backtracking(
+            graph,
+            label_to_id[start_label],
+            bool(req.find_cycle),
+        )
+
+        result_steps = []
+        for step in steps:
+            result_steps.append({
+                "current_node": int(step.current_node),
+                "action": step.action,
+                "path": [int(x) for x in step.path],
+                "visited": [int(x) for x in step.visited],
+                "depth": int(step.depth),
+                "found": bool(step.found),
+            })
+
+        return {
+            "steps": result_steps,
+            "edges": parsed_edges,
+            "nodes": sorted(nodes),
+            "node_labels": node_labels,
+            "find_cycle": bool(req.find_cycle),
+        }
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
 @router.post("/tarjan")
 async def run_tarjan(req: TarjanRequest):
     try:

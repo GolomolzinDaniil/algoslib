@@ -1432,6 +1432,7 @@ document.getElementById('graph-algo').addEventListener('change', (e) => {
     const label = document.getElementById('edges-label');
     const sourceLabel = document.getElementById('source-label');
     const sinkField = document.getElementById('sink-field');
+    const cycleField = document.getElementById('hamiltonian-cycle-field');
     const algo = e.target.value;
     if (algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal') {
         label.textContent = 'Рёбра (по одному на строке: A B вес):';
@@ -1441,7 +1442,7 @@ document.getElementById('graph-algo').addEventListener('change', (e) => {
         label.textContent = 'Рёбра (A B пропускная_способность):';
         if (sourceLabel) sourceLabel.textContent = 'Источник (source):';
         if (sinkField) sinkField.style.display = 'block';
-    } else if (algo === 'tarjan' || algo === 'kosaraju') {  
+    } else if (algo === 'tarjan' || algo === 'kosaraju') {
         label.textContent = 'Рёбра ориентированного графа (A B):';
         if (sourceLabel) sourceLabel.textContent = 'Не требуется:';
         if (sinkField) sinkField.style.display = 'none';
@@ -1450,9 +1451,11 @@ document.getElementById('graph-algo').addEventListener('change', (e) => {
         if (sourceLabel) sourceLabel.textContent = 'Начальная вершина:';
         if (sinkField) sinkField.style.display = 'none';
     }
-    
+
+    if (cycleField) cycleField.style.display = (algo === 'hamiltonian') ? 'flex' : 'none';
+
     const startInput = document.getElementById('graph-start');
-    if (algo === 'kruskal' || algo === 'tarjan' || algo === 'kosaraju' || algo === 'stalin_sort') { 
+    if (algo === 'kruskal' || algo === 'tarjan' || algo === 'kosaraju' || algo === 'stalin_sort' || algo === 'hierholzer') {
         startInput.disabled = true;
         startInput.placeholder = 'Не требуется';
     } else {
@@ -1483,6 +1486,14 @@ document.getElementById('graph-example').addEventListener('click', () => {
     } else if (algo === 'stalin_sort') {
         document.getElementById('graph-edges').value = 'A B\nA C\nB C\nC D\nD E\nB E';
         document.getElementById('graph-start').value = '';
+    } else if (algo === 'hierholzer') {
+        // Граф K3 + квадрат с общей вершиной — все степени чётные, есть эйлеров цикл
+        document.getElementById('graph-edges').value = 'A B\nB C\nC A\nA D\nD E\nE A';
+        document.getElementById('graph-start').value = '';
+    } else if (algo === 'hamiltonian') {
+        // K4 — гамильтонов путь и цикл существуют
+        document.getElementById('graph-edges').value = 'A B\nA C\nA D\nB C\nB D\nC D';
+        document.getElementById('graph-start').value = 'A';
     } else {
         document.getElementById('graph-edges').value = 'A B\nA C\nB D\nC D\nD E\nE F\nC F';
         document.getElementById('graph-start').value = 'A';
@@ -1515,7 +1526,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
         return;
     }
 
-    if (!startNode && algo !== 'kruskal' && algo !== 'ford_fulkerson' && algo !== 'tarjan' && algo !== 'kosaraju' && algo !== 'stalin_sort') {
+    if (!startNode && algo !== 'kruskal' && algo !== 'ford_fulkerson' && algo !== 'tarjan' && algo !== 'kosaraju' && algo !== 'stalin_sort' && algo !== 'hierholzer') {
         graphPlayer.el.status.textContent = 'Введите стартовую ноду';
         return;
     }
@@ -1557,11 +1568,16 @@ document.getElementById('graph-run').addEventListener('click', async () => {
     graphPlayer.el.status.textContent = 'Загрузка...';
 
     try {
-        const reqBody = (algo === 'kruskal' || algo === 'tarjan' || algo === 'kosaraju' || algo === 'stalin_sort')
+        const findCycleInput = document.getElementById('graph-find-cycle');
+        const findCycle = !!(findCycleInput && findCycleInput.checked);
+
+        const reqBody = (algo === 'kruskal' || algo === 'tarjan' || algo === 'kosaraju' || algo === 'stalin_sort' || algo === 'hierholzer')
             ? { edges }
             : algo === 'ford_fulkerson' || algo === 'edmonds_karp'
                 ? { edges, start_node: startNode, sink: sinkNode }
-                : { edges, start_node: startNode };
+                : algo === 'hamiltonian'
+                    ? { edges, start_node: startNode, find_cycle: findCycle }
+                    : { edges, start_node: startNode };
 
         const res = await fetch(`/api/graphs/${algo}`, {
             method: 'POST',
