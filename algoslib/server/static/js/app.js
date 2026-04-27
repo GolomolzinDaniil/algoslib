@@ -1259,6 +1259,36 @@ if (searchTargetInput) {
     });
 }
 
+const searchExampleBtn = document.getElementById('search-example');
+if (searchExampleBtn) {
+    searchExampleBtn.addEventListener('click', () => {
+        if (!searchDataInput || !searchTargetInput || !searchAlgoSelect) return;
+
+        let algo = searchAlgoSelect.value;
+        if (!algo) {
+            algo = 'linear_searche';
+            searchAlgoSelect.value = algo;
+            searchAlgoSelect.dispatchEvent(new Event('change'));
+        }
+
+        if (algo === 'binary_search') {
+            searchDataInput.value = '12, 5, 9, 1, 7, 3, 10, 2, 8, 6, 4, 11';
+            searchTargetInput.value = '8';
+        } else if (algo === 'linear_searche_both_sides') {
+            searchDataInput.value = '14, 3, 9, 1, 7, 18, 5, 11, 6, 2';
+            searchTargetInput.value = '11';
+        } else {
+            searchDataInput.value = '5, 3, 8, 1, 4, 2, 7, 6';
+            searchTargetInput.value = '4';
+        }
+
+        resetSearchSession();
+        renderSearchInputPreview();
+        if (searchPlayer.el.status) searchPlayer.el.status.textContent = 'Пример загружен';
+        if (window.lucide) lucide.createIcons();
+    });
+}
+
 if (searchArrayToggle) {
     searchArrayToggle.addEventListener('click', () => {
         searchPlotCollapsed = !searchPlotCollapsed;
