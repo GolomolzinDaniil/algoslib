@@ -38,23 +38,22 @@ except ImportError:
     edmonds_karp = None
 
 try:
-    from .sub_graphs import Tarjan_Step, tarjan_scc, OrientedGraph
+    from .sub_graphs import Hierholzer_Step, hierholzer
 except ImportError:
-    Tarjan_Step = None
-    tarjan_scc = None
-    OrientedGraph = None
+    Hierholzer_Step = None
+    hierholzer = None
 
 try:
-    from .sub_graphs import Kosaraju_Step, kosaraju_scc
+    from .sub_graphs import Hamiltonian_Step, hamiltonian_backtracking
 except ImportError:
-    Kosaraju_Step = None
-    kosaraju_scc = None
-
+    Hamiltonian_Step = None
+    hamiltonian_backtracking = None
 
 __all__ = ['bfs', 'Graph', 'BFS_Step', 'Weighted_Graph', 'Dijkstra_Step', 'dijkstra',
            'Ford_Step', 'bellman_ford', 'Kruskal_Step', 'kruskal',
            'Stalin_Step', 'stalin_sort',
            'Flow_Graph', 'FordFulkerson_Step', 'FordFulkerson_Result', 'ford_fulkerson',
            'EdmondsKarp_Step', 'EdmondsKarp_Result', 'edmonds_karp',
-           'Tarjan_Step', 'tarjan_scc', 'OrientedGraph', 'Kosaraju_Step', 'kosaraju_scc',
+           'Hierholzer_Step', 'hierholzer',
+           'Hamiltonian_Step', 'hamiltonian_backtracking',
           ]

@@ -109,6 +109,33 @@ export function updateGraphStep(svg, nodes, edges, step, algorithm, nodeLabels =
         cliqueSet = new Set(step.clique || []);
     }
 
+    // Hierholzer: подсвечиваем рёбра текущего пути (circuit) как «принятые»
+    let hierholzerStackSet = null;
+    let hierholzerCircuitSet = null;
+    if (algorithm === 'hierholzer') {
+        hierholzerStackSet = new Set(step.stack || []);
+        hierholzerCircuitSet = new Set(step.circuit || []);
+        // Рёбра пройденного пути (circuit) — рисуем как MST
+        mstEdgeSet = new Set();
+        const circuit = step.circuit || [];
+        for (let i = 0; i < circuit.length - 1; i++) {
+            mstEdgeSet.add(`${circuit[i]}-${circuit[i + 1]}`);
+            mstEdgeSet.add(`${circuit[i + 1]}-${circuit[i]}`);
+        }
+    }
+
+    // Hamiltonian: подсвечиваем рёбра текущего пути
+    let hamiltonianPathSet = null;
+    if (algorithm === 'hamiltonian') {
+        hamiltonianPathSet = new Set(step.path || []);
+        mstEdgeSet = new Set();
+        const path = step.path || [];
+        for (let i = 0; i < path.length - 1; i++) {
+            mstEdgeSet.add(`${path[i]}-${path[i + 1]}`);
+            mstEdgeSet.add(`${path[i + 1]}-${path[i]}`);
+        }
+    }
+
     const nodeColors = {};
     for (const n of nodes) {
         if (algorithm === 'stalin_sort') {
@@ -135,6 +162,15 @@ export function updateGraphStep(svg, nodes, edges, step, algorithm, nodeLabels =
         } else if (algorithm === 'bellman_ford') {
             if (n === step.edge_from) nodeColors[n] = COLORS.current;
             else if (visited.has(n)) nodeColors[n] = COLORS.visited;
+            else nodeColors[n] = COLORS.defaultNode;
+        } else if (algorithm === 'hierholzer') {
+            if (n === current) nodeColors[n] = COLORS.current;
+            else if (hierholzerCircuitSet.has(n)) nodeColors[n] = COLORS.visited;
+            else if (hierholzerStackSet.has(n)) nodeColors[n] = COLORS.queue;
+            else nodeColors[n] = COLORS.defaultNode;
+        } else if (algorithm === 'hamiltonian') {
+            if (n === current && step.action !== 'backtrack') nodeColors[n] = COLORS.current;
+            else if (hamiltonianPathSet.has(n)) nodeColors[n] = COLORS.visited;
             else nodeColors[n] = COLORS.defaultNode;
         } else {
             if (n === current) nodeColors[n] = COLORS.current;
@@ -667,6 +703,47 @@ function formatInfo(step, algorithm, nodeLabels = {}) {
             .map(n => getNodeLabel(n, nodeLabels))
             .join(', ');
         lines.push(`<span class="label">В ссылке:</span> <span class="value">[${exiledLabels}]</span>`);
+        return lines.join('<br>');
+    }
+
+    if (algorithm === 'hierholzer') {
+        const actionLabels = {
+            'init': 'Старт',
+            'push': 'Переход по ребру',
+            'pop': 'Тупик — добавление в путь',
+            'no_path': 'Эйлеров путь не существует',
+            'done': step.is_circuit ? 'Эйлеров цикл найден' : 'Эйлеров путь найден',
+        };
+        lines.push(`<span class="label">Действие:</span> <span class="value">${actionLabels[step.action] || step.action}</span>`);
+        if (step.current_node !== undefined && step.current_node !== -1) {
+            lines.push(`<span class="label">Вершина:</span> <span class="value">${getNodeLabel(step.current_node, nodeLabels)}</span>`);
+        }
+        const stackLabels = (step.stack || []).map(n => getNodeLabel(n, nodeLabels)).join(' → ');
+        lines.push(`<span class="label">Стек:</span> <span class="value">[${stackLabels}]</span>`);
+        const circuitLabels = (step.circuit || []).map(n => getNodeLabel(n, nodeLabels)).join(' → ');
+        lines.push(`<span class="label">Путь (circuit):</span> <span class="value">[${circuitLabels}]</span>`);
+        const remaining = (step.remaining_edges || [])
+            .map(e => `${getNodeLabel(e[0], nodeLabels)}—${getNodeLabel(e[1], nodeLabels)}`)
+            .join(', ');
+        lines.push(`<span class="label">Непройденные рёбра:</span> <span class="value">[${remaining}]</span>`);
+        return lines.join('<br>');
+    }
+
+    if (algorithm === 'hamiltonian') {
+        const actionLabels = {
+            'init': 'Старт',
+            'visit': 'Посещение вершины',
+            'backtrack': 'Откат',
+            'found': 'Гамильтонов путь/цикл найден!',
+            'fail': 'Путь не найден',
+        };
+        lines.push(`<span class="label">Действие:</span> <span class="value">${actionLabels[step.action] || step.action}</span>`);
+        lines.push(`<span class="label">Вершина:</span> <span class="value">${getNodeLabel(step.current_node, nodeLabels)}</span>`);
+        const pathLabels = (step.path || []).map(n => getNodeLabel(n, nodeLabels)).join(' → ');
+        lines.push(`<span class="label">Путь:</span> <span class="value">[${pathLabels}]</span>`);
+        lines.push(`<span class="label">Глубина:</span> <span class="value">${step.depth}</span>`);
+        const visitedLabels = (step.visited || []).map(n => getNodeLabel(n, nodeLabels)).join(', ');
+        lines.push(`<span class="label">Посещены:</span> <span class="value">[${visitedLabels}]</span>`);
         return lines.join('<br>');
     }
 

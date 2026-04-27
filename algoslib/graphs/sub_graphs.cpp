@@ -9,8 +9,8 @@
 #include "stalin_sort.hpp"
 #include "ford_fulkerson.hpp"
 #include "edmonds_karp.hpp"
-#include "tarjan.hpp"
-#include "kosaraju.hpp"
+#include "hierholzer.hpp"
+#include "hamiltonian.hpp"
 
 namespace py = pybind11;
 
@@ -178,71 +178,50 @@ PYBIND11_MODULE(sub_graphs, m) {
         py::arg("graph"), py::arg("source"), py::arg("sink"),
         "Алгоритм Эдмондса-Карпа (BFS версия Форда-Фалкерсона)");
 
-
-     py::class_<Tarjan_Step>(m, "Tarjan_Step")
-        .def_readonly("current_node", &Tarjan_Step::current_node,
+    // Структура шага алгоритма Хирхольцера
+    py::class_<Hierholzer_Step>(m, "Hierholzer_Step")
+        .def_readonly("current_node", &Hierholzer_Step::current_node,
                       "Текущая обрабатываемая вершина")
-        .def_readonly("stack", &Tarjan_Step::stack,
-                      "Стек DFS: список вершин в текущем пути")
-        .def_readonly("index_map", &Tarjan_Step::index_map,
-                      "Словарь {node_id: discovery_index}")
-        .def_readonly("lowlink_map", &Tarjan_Step::lowlink_map,
-                      "Словарь {node_id: lowlink_value}")
-        .def_readonly("on_stack_nodes", &Tarjan_Step::on_stack_nodes,
-                      "Список вершин, находящихся на стеке")
-        .def_readonly("edge_from", &Tarjan_Step::edge_from,
-                      "Исходная вершина исследуемого ребра (-1 если нет)")
-        .def_readonly("edge_to", &Tarjan_Step::edge_to,
-                      "Целевая вершина исследуемого ребра (-1 если нет)")
-        .def_readonly("edge_type", &Tarjan_Step::edge_type,
-                      "Тип ребра: 'tree', 'back', 'cross', 'forward', 'none'")
-        .def_readonly("completed_sccs", &Tarjan_Step::completed_sccs,
-                      "Список уже найденных компонент связности: List[List[int]]")
-        .def_readonly("current_scc", &Tarjan_Step::current_scc,
-                      "Компонента, извлекаемая из стека на этом шаге: List[int]")
-        .def_readonly("action", &Tarjan_Step::action,
-                      "Тип действия: 'visit', 'explore_edge', 'update_lowlink', 'found_scc', 'done'")
-        .def_readonly("index_counter", &Tarjan_Step::index_counter,
-                      "Текущее значение счётчика индексов");
+        .def_readonly("action", &Hierholzer_Step::action,
+                      "Тип шага: 'init', 'push', 'pop', 'no_path', 'done'")
+        .def_readonly("stack", &Hierholzer_Step::stack,
+                      "Текущее состояние стека алгоритма")
+        .def_readonly("circuit", &Hierholzer_Step::circuit,
+                      "Накопленный эйлеров путь/цикл (в финальном шаге — итог)")
+        .def_readonly("remaining_edges", &Hierholzer_Step::remaining_edges,
+                      "Список ещё не пройденных рёбер: List[Tuple[int, int]]")
+        .def_readonly("euler_exists", &Hierholzer_Step::euler_exists,
+                      "Существует ли в графе эйлеров путь/цикл")
+        .def_readonly("is_circuit", &Hierholzer_Step::is_circuit,
+                      "True - найден эйлеров цикл, False - эйлеров путь");
 
-    py::class_<OrientedGraph>(m, "OrientedGraph")
-        .def(py::init<>())
-        .def("add_edge", &OrientedGraph::add_edge, py::arg("u"), py::arg("v"),
-             "Добавить направленное ребро u -> v")
-        .def("get_neighbors", &OrientedGraph::get_neighbors,
-             "Получить список исходящих соседей вершины");
-
-    m.def("tarjan_scc", &tarjan_scc, py::arg("graph"),
-          "Алгоритм Тарьяна для поиска сильно связных компонент (SCC). "
-          "Возвращает список шагов для визуализации.");
-
-    py::class_<Kosaraju_Step>(m, "Kosaraju_Step")
-        .def_readonly("phase", &Kosaraju_Step::phase,
-                      "Номер фазы: 1=DFS исходный, 2=транспонирование, 3=DFS транспонированный")
-        .def_readonly("current_node", &Kosaraju_Step::current_node,
-                      "Текущая вершина")
-        .def_readonly("stack", &Kosaraju_Step::stack,
-                      "Стек DFS")
-        .def_readonly("finish_order", &Kosaraju_Step::finish_order,
-                      "Порядок завершения вершин (после фазы 1)")
-        .def_readonly("processing_order", &Kosaraju_Step::processing_order,
-                      "Порядок обработки в фазе 3")
-        .def_readonly("edge_from", &Kosaraju_Step::edge_from,
-                      "Исследуемое ребро: from")
-        .def_readonly("edge_to", &Kosaraju_Step::edge_to,
-                      "Исследуемое ребро: to")
-        .def_readonly("completed_sccs", &Kosaraju_Step::completed_sccs,
-                      "Найденные компоненты: List[List[int]]")
-        .def_readonly("current_scc", &Kosaraju_Step::current_scc,
-                      "Извлекаемая компонента сейчас")
-        .def_readonly("action", &Kosaraju_Step::action,
-                      "Действие: 'start_dfs1', 'visit', 'finish', 'transpose', 'start_dfs2', 'found_scc', 'done'")
-        .def_readonly("is_transposed_edge", &Kosaraju_Step::is_transposed_edge,
-                      "Является ли ребро транспонированным (bool)");
-
-    m.def("kosaraju_scc",
-          &kosaraju_scc,
+    // Функция hierholzer
+    m.def("hierholzer",
+          &hierholzer,
           py::arg("graph"),
-          "Алгоритм Косараджу для поиска сильно связных компонент. "
-          "Возвращает список шагов (List[Kosaraju_Step]) для визуализации.");
+          "Алгоритм Хирхольцера. Находит эйлеров путь или цикл в неориентированном "
+          "графе. Возвращает список шагов (List[Hierholzer_Step]).");
+
+    // Структура шага Backtracking-поиска гамильтонова пути/цикла
+    py::class_<Hamiltonian_Step>(m, "Hamiltonian_Step")
+        .def_readonly("current_node", &Hamiltonian_Step::current_node,
+                      "Вершина, которую сейчас пробуем")
+        .def_readonly("action", &Hamiltonian_Step::action,
+                      "Тип шага: 'init', 'visit', 'backtrack', 'found', 'fail'")
+        .def_readonly("path", &Hamiltonian_Step::path,
+                      "Текущая последовательность вершин в пути")
+        .def_readonly("visited", &Hamiltonian_Step::visited,
+                      "Отсортированный список посещённых вершин")
+        .def_readonly("depth", &Hamiltonian_Step::depth,
+                      "Глубина рекурсии (длина текущего пути)")
+        .def_readonly("found", &Hamiltonian_Step::found,
+                      "Найден ли уже гамильтонов путь/цикл к этому шагу");
+
+    // Функция hamiltonian_backtracking
+    m.def("hamiltonian_backtracking",
+          &hamiltonian_backtracking,
+          py::arg("graph"), py::arg("start_node"), py::arg("find_cycle") = false,
+          "Перебор с возвратом для поиска гамильтонова пути или цикла. "
+          "find_cycle=True ищет гамильтонов цикл (с возвратом в start_node). "
+          "Возвращает список шагов (List[Hamiltonian_Step]).");
 }

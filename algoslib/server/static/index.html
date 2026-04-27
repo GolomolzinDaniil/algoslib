@@ -117,6 +117,8 @@
                         <option value="edmonds_karp">Edmonds-Karp (BFS поток)</option>
                         <option value="tarjan">Tarjan (SCC)</option>
                         <option value="kosaraju">Kosaraju (SCC)</option>
+                        <option value="hierholzer">Hierholzer (Эйлеров путь/цикл)</option>
+                        <option value="hamiltonian">Hamiltonian (Backtracking)</option>
                     </select>
                 </div>
                 <div class="input-row vertical">
@@ -134,6 +136,10 @@ D E</textarea>
                 <div id="sink-field" class="input-row" style="display: none;">
                     <label for="graph-sink">Сток (sink):</label>
                     <input type="text" id="graph-sink" value="F" placeholder="F" maxlength="3">
+                </div>
+                <div id="hamiltonian-cycle-field" class="input-row" style="display: none;">
+                    <label for="graph-find-cycle">Искать цикл:</label>
+                    <input type="checkbox" id="graph-find-cycle">
                 </div>
                 <div class="input-row">
                     <button class="btn primary" id="graph-run">
