@@ -916,6 +916,9 @@ function appendFinalSearchResultStep(steps, resultIndexes) {
     const lastFoundIndices = Array.isArray(lastStep.found_indices)
         ? lastStep.found_indices
         : [];
+    const lastActiveIndices = Array.isArray(lastStep.active_indices)
+        ? lastStep.active_indices
+        : [];
 
     if (lastCurrentIndices.length === 0 && isSameIndexOrder(lastFoundIndices, resultIndexes)) {
         return safeSteps;
@@ -934,10 +937,40 @@ function appendFinalSearchResultStep(steps, resultIndexes) {
         current_index: -1,
         checked_until: checkedUntil,
         found_indices: [...resultIndexes],
+        active_indices: [...lastActiveIndices],
         is_match: true,
     });
 
     return safeSteps;
+}
+
+function prependInitialSearchStep(steps, dataLength) {
+    const safeSteps = Array.isArray(steps) ? [...steps] : [];
+    if (!Number.isInteger(dataLength) || dataLength <= 0 || safeSteps.length === 0) {
+        return safeSteps;
+    }
+
+    const firstStep = safeSteps[0] || {};
+    const firstCurrent = Array.isArray(firstStep.current_indices) ? firstStep.current_indices : [];
+    const firstFound = Array.isArray(firstStep.found_indices) ? firstStep.found_indices : [];
+    const firstActive = Array.isArray(firstStep.active_indices) ? firstStep.active_indices : [];
+    if (firstStep.is_initial_state === true ||
+        (firstCurrent.length === 0 && firstFound.length === 0 && firstActive.length === 0)) {
+        return safeSteps;
+    }
+
+    return [
+        {
+            current_indices: [],
+            current_index: -1,
+            checked_until: -1,
+            found_indices: [],
+            active_indices: [],
+            is_match: false,
+            is_initial_state: true,
+        },
+        ...safeSteps,
+    ];
 }
 
 function buildSearchSteps(data, resultIndexes, historyIndexes = []) {
@@ -989,9 +1022,11 @@ function buildSearchSteps(data, resultIndexes, historyIndexes = []) {
             return appendFinalSearchResultStep([], safeResultIndexes);
         }
 
+        const activeSet = new Set();
         for (const stepData of objectHistory) {
             const idx = stepData.mid;
             const isMatch = stepData.isMatch || resultSet.has(idx);
+            activeSet.add(idx);
 
             if (isMatch && !foundSet.has(idx)) {
                 foundSet.add(idx);
@@ -1008,6 +1043,7 @@ function buildSearchSteps(data, resultIndexes, historyIndexes = []) {
                 right_index: stepData.right,
                 compared_value: stepData.comparedValue,
                 target_value: stepData.targetValue,
+                active_indices: [...activeSet],
             });
         }
 
@@ -1030,12 +1066,14 @@ function buildSearchSteps(data, resultIndexes, historyIndexes = []) {
             return appendFinalSearchResultStep([], safeResultIndexes);
         }
 
+        const activeSet = new Set();
         for (const pair of pairHistory) {
             const [left, right] = pair;
             const currentIndices = left === right ? [left] : [left, right];
             let isMatch = false;
 
             for (const idx of currentIndices) {
+                activeSet.add(idx);
                 if (resultSet.has(idx)) {
                     isMatch = true;
                     if (!foundSet.has(idx)) {
@@ -1050,6 +1088,7 @@ function buildSearchSteps(data, resultIndexes, historyIndexes = []) {
                 current_index: currentIndices[0] ?? -1,
                 checked_until: currentIndices[currentIndices.length - 1] ?? -1,
                 found_indices: [...foundSoFar],
+                active_indices: [...activeSet],
                 is_match: isMatch,
             });
         }
@@ -1060,9 +1099,11 @@ function buildSearchSteps(data, resultIndexes, historyIndexes = []) {
         .map((idx) => Number(idx))
         .filter((idx) => Number.isInteger(idx) && idx >= 0 && idx < safeData.length);
     const traversal = linearHistory;
+    const activeSet = new Set();
 
     for (const idx of traversal) {
         const isMatch = resultSet.has(idx);
+        activeSet.add(idx);
         if (isMatch && !foundSet.has(idx)) {
             foundSet.add(idx);
             foundSoFar.push(idx);
@@ -1072,6 +1113,7 @@ function buildSearchSteps(data, resultIndexes, historyIndexes = []) {
             current_index: idx,
             checked_until: idx,
             found_indices: [...foundSoFar],
+            active_indices: [...activeSet],
             is_match: isMatch,
         });
     }
@@ -1083,7 +1125,8 @@ function applySearchResult(apiResult, data, target) {
     const visualData = Array.isArray(apiResult?.visual_data) ? apiResult.visual_data : data;
     const resultIndexes = Array.isArray(apiResult?.result) ? apiResult.result : [];
     const historyIndexes = Array.isArray(apiResult?.history) ? apiResult.history : [];
-    const steps = buildSearchSteps(visualData, resultIndexes, historyIndexes);
+    const builtSteps = buildSearchSteps(visualData, resultIndexes, historyIndexes);
+    const steps = prependInitialSearchStep(builtSteps, visualData.length);
 
     searchData = {
         steps,
@@ -1121,7 +1164,8 @@ function applySearchResult(apiResult, data, target) {
         searchData.initialArray,
         firstStep.current_indices || firstStep.current_index,
         firstStep.found_indices,
-        firstStep.checked_until
+        firstStep.checked_until,
+        firstStep.active_indices
     );
 
     syncSearchArrayToggle();
