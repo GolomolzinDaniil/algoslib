@@ -12,10 +12,11 @@ function toSafeIndexList(raw, upperBound) {
     return normalized;
 }
 
-function getCellColor(index, currentSet, _checkedUntil, foundSet) {
-    if (currentSet.has(index)) return 'red';
+function getCellColor(index, currentSet, foundSet, activeSet) {
     if (foundSet.has(index)) return 'green';
-    return 'blue';
+    if (currentSet.has(index)) return 'yellow';
+    if (activeSet.has(index)) return 'blue';
+    return 'red';
 }
 
 export function renderSearchCells(
@@ -23,7 +24,8 @@ export function renderSearchCells(
     data,
     currentIndex = -1,
     foundIndexes = [],
-    checkedUntil = -1
+    checkedUntil = -1,
+    activeIndexes = []
 ) {
     if (!container) return;
     container.innerHTML = '';
@@ -34,10 +36,11 @@ export function renderSearchCells(
         ? toSafeIndexList(currentIndex, safeData.length)
         : toSafeIndexList([currentIndex], safeData.length);
     const currentSet = new Set(currentIndexes);
+    const activeSet = new Set(toSafeIndexList(activeIndexes, safeData.length));
 
     safeData.forEach((value, idx) => {
         const cell = document.createElement('div');
-        cell.className = `cell ${getCellColor(idx, currentSet, checkedUntil, foundSet)}`;
+        cell.className = `cell ${getCellColor(idx, currentSet, foundSet, activeSet)}`;
         cell.textContent = String(value);
         container.appendChild(cell);
     });
@@ -67,16 +70,23 @@ export function updateSearchStep(
         ? step.checked_until
         : (currentIndices.length > 0 ? currentIndices[currentIndices.length - 1] : -1);
     const foundIndexes = toSafeIndexList(step.found_indices, safeData.length);
+    const activeIndexes = toSafeIndexList(step.active_indices, safeData.length);
 
-    renderSearchCells(container, safeData, currentIndices, foundIndexes, checkedUntil);
+    renderSearchCells(container, safeData, currentIndices, foundIndexes, checkedUntil, activeIndexes);
 
     const currentValues = currentIndices
         .filter((idx) => idx >= 0 && idx < safeData.length)
         .map((idx) => safeData[idx]);
-    const matchLabel = step.is_match ? 'совпадение найдено' : 'совпадения нет';
-    const stepLabel = `Шаг ${Math.min(stepIndex + 1, Math.max(1, safeSteps.length))} / ${Math.max(1, safeSteps.length)}`;
+    const matchLabel = step.is_initial_state
+        ? 'ожидание запуска'
+        : (step.is_match ? 'совпадение найдено' : 'совпадения нет');
+    const stepLabel = step.is_initial_state
+        ? 'Старт'
+        : `Шаг ${Math.min(stepIndex + 1, Math.max(1, safeSteps.length))} / ${Math.max(1, safeSteps.length)}`;
     let inspectLabel = 'ожидание шага';
-    if (currentIndices.length === 0 && foundIndexes.length > 0) {
+    if (step.is_initial_state) {
+        inspectLabel = 'все элементы пока не просмотрены';
+    } else if (currentIndices.length === 0 && foundIndexes.length > 0) {
         inspectLabel = `результат: индекс ${foundIndexes.join(', ')}`;
     } else if (
         currentIndices.length === 1 &&
