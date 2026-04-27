@@ -843,16 +843,16 @@ function setSearchResultIndexes(indexes) {
     if (!searchResultIndexes) return;
 
     if (!Array.isArray(indexes) || indexes.length === 0) {
-        searchResultIndexes.innerHTML = '';
+        searchResultIndexes.textContent = '';
         return;
     }
 
-    const value = indexes.join(', ');
-    searchResultIndexes.innerHTML =
-        `<div class="search-result-chip">` +
-        `<span class="search-result-label">Индекс искомого элемента</span>` +
-        `<span class="search-result-value">${value}</span>` +
-        `</div>`;
+    if (indexes.length === 1) {
+        searchResultIndexes.textContent = `✅ Индекс первого совпадения: ${indexes[0]}`;
+        return;
+    }
+
+    searchResultIndexes.textContent = `✅ Индексы совпадений: ${indexes.join(', ')}`;
 }
 
 function resetSearchSession() {
@@ -1208,18 +1208,28 @@ function renderSearchStep(idx) {
         searchData.initialArray,
         idx
     );
-    searchPlayer.el.status.textContent = msg;
     syncSearchArrayToggle();
 
     const isLastStep = searchData.steps.length > 0 && idx >= searchData.steps.length - 1;
-    if (isLastStep) {
-        const visibleResult = Array.isArray(searchData.steps[idx]?.found_indices)
-            ? searchData.steps[idx].found_indices
-            : [];
-        setSearchResultIndexes(visibleResult);
-    } else {
+    if (!isLastStep) {
+        searchPlayer.el.status.textContent = msg;
         setSearchResultIndexes([]);
+        return;
     }
+
+    const visibleResult = Array.isArray(searchData.steps[idx]?.found_indices)
+        ? searchData.steps[idx].found_indices
+        : [];
+
+    if (visibleResult.length === 1) {
+        searchPlayer.el.status.textContent = `✅ Индекс первого совпадения: ${visibleResult[0]}`;
+    } else if (visibleResult.length > 1) {
+        searchPlayer.el.status.textContent = `✅ Индексы совпадений: ${visibleResult.join(', ')}`;
+    } else {
+        searchPlayer.el.status.textContent = '❌ Совпадений не найдено';
+    }
+
+    setSearchResultIndexes([]);
 }
 
 if (searchAlgoSelect) {
