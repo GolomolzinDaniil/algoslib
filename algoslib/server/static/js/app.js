@@ -94,9 +94,9 @@ const SEARCH_META = {
     },
     binary_search: {
         title: "Binary Search",
-        desc: "Сортирует массив (bubble sort) и сравнивает середину диапазона с целью",
-        time: "Время: O(n² + log n)",
-        memory: "Память: О(n)",
+        desc: "Ищет элемент в отсортированном массиве, деля диапазон пополам",
+        time: "Время: O(log n)",
+        memory: "Память: О(1)",
     },
 };
 
