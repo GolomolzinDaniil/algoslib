@@ -971,3 +971,147 @@ export function updateKosarajuStep(svg, nodes, edges, step, nodeLabels = {}) {
     
     return lines.join('<br>');
 }
+
+const ASTAR_COLORS = {
+    open: '#ce9178',        // оранжевый — в open set
+    closed: '#4ec9b0',      // бирюзовый — в closed set
+    current: '#f44747',     // красный — текущая вершина
+    path: '#b4befe',        // сиреневый — финальный путь
+    edgeRelaxed: '#4ec9b0', // бирюзовый — релаксированное ребро
+};
+
+export function updateAStarStep(svg, nodes, edges, step, nodeLabels = {}, nodeCoords = {}) {
+    const openSet = new Set(step.open_set || []);
+    const closedSet = new Set(step.closed_set || []);
+    const current = step.current_node;
+    const pathSet = new Set(step.current_path || []);
+
+    let activeEdge = null;
+    let relaxedEdge = null;
+    
+    if (step.edge_from !== null && step.edge_to !== null) {
+        activeEdge = [step.edge_from, step.edge_to];
+        if (step.action === 'relax') {
+            relaxedEdge = [step.edge_from, step.edge_to];
+        }
+    }
+
+    // Цвета вершин
+    const nodeColors = {};
+    for (const n of nodes) {
+        if (step.path_found && pathSet.has(n)) {
+            nodeColors[n] = ASTAR_COLORS.path;  // Финальный путь
+        } else if (n === current) {
+            nodeColors[n] = ASTAR_COLORS.current;  // Текущая
+        } else if (closedSet.has(n)) {
+            nodeColors[n] = ASTAR_COLORS.closed;  // Обработана
+        } else if (openSet.has(n)) {
+            nodeColors[n] = ASTAR_COLORS.open;  // В очереди
+        } else {
+            nodeColors[n] = COLORS.defaultNode;  // Не посещена
+        }
+    }
+
+    // Отрисовка
+    draw(
+        svg,
+        nodes,
+        edges,
+        true,  // weighted = true для A*
+        nodeColors,
+        step.f_scores || {},  // Показываем f-значения как "расстояния"
+        activeEdge,
+        relaxedEdge,
+        nodeLabels,
+        null
+    );
+
+    // Инфо-панель
+    const lines = [];
+    const actionLabels = {
+        'init': 'Инициализация',
+        'expand': 'Обработка вершины',
+        'relax': 'Релаксация ребра',
+        'explore_edge': 'Исследование ребра',
+        'found': 'Путь найден!',
+        'no_path': 'Путь не найден'
+    };
+    
+    lines.push(`<span class="label">Действие:</span> <span class="value">${actionLabels[step.action] || step.action}</span>`);
+    
+    if (current !== null && current !== -1) {
+        lines.push(`<span class="label">Вершина:</span> <span class="value">${getNodeLabel(current, nodeLabels)}</span>`);
+    }
+    
+    if (activeEdge) {
+        lines.push(`<span class="label">Ребро:</span> <span class="value">${getNodeLabel(step.edge_from, nodeLabels)} → ${getNodeLabel(step.edge_to, nodeLabels)}</span>`);
+    }
+    
+    // Показываем g/h/f для текущей вершины
+    if (current !== null && current !== -1 && step.f_scores?.[current] !== undefined) {
+        const g = step.g_scores?.[current] ?? 0;
+        const h = step.h_scores?.[current] ?? 0;
+        const f = step.f_scores[current];
+        lines.push(`<span class="label">g/h/f:</span> <span class="value">${g.toFixed(2)} / ${h.toFixed(2)} / ${f.toFixed(2)}</span>`);
+    }
+    
+    // Open/Closed sets
+    if (step.open_set?.length > 0) {
+        const openLabels = step.open_set.slice(0, 6).map(n => getNodeLabel(n, nodeLabels)).join(', ');
+        const more = step.open_set.length > 6 ? `... +${step.open_set.length - 6}` : '';
+        lines.push(`<span class="label">Open:</span> <span class="value">[${openLabels}${more}]</span>`);
+    }
+    
+    if (step.closed_set?.length > 0) {
+        lines.push(`<span class="label">Closed:</span> <span class="value">${step.closed_set.length} вершин</span>`);
+    }
+    
+    // Финальный путь
+    if (step.path_found && step.current_path?.length > 0) {
+        const pathLabels = step.current_path.map(n => getNodeLabel(n, nodeLabels)).join(' → ');
+        lines.push(`<span class="label">Путь:</span> <span class="value">${pathLabels}</span>`);
+        const totalCost = step.g_scores?.[step.current_path[step.current_path.length - 1]] ?? 0;
+        lines.push(`<span class="label">Стоимость:</span> <span class="value">${totalCost.toFixed(2)}</span>`);
+    }
+    
+    return lines.join('<br>');
+}
+
+export function updateBiDijkstraStep(svg, nodes, edges, step, nodeLabels = {}) {
+    const fOpen = new Set(step.forward_open || []);
+    const fClosed = new Set(step.forward_closed || []);
+    const bOpen = new Set(step.backward_open || []);
+    const bClosed = new Set(step.backward_closed || []);
+    const pathSet = new Set(step.current_path || []);
+
+    let activeEdge = null;
+    if (step.edge_from !== null && step.edge_to !== null) activeEdge = [step.edge_from, step.edge_to];
+
+    const nodeColors = {};
+    for (const n of nodes) {
+        if (step.path_found && pathSet.has(n)) nodeColors[n] = '#a6e3a1'; // Путь
+        else if (n === step.current_node) nodeColors[n] = '#f44747';      // Текущая
+        else if (fClosed.has(n) && bClosed.has(n)) nodeColors[n] = '#cba6f7'; // Встреча
+        else if (fClosed.has(n)) nodeColors[n] = '#89b4fa';               // Вперёд
+        else if (bClosed.has(n)) nodeColors[n] = '#fab387';               // Назад
+        else if (fOpen.has(n) || bOpen.has(n)) nodeColors[n] = '#ce9178'; // В очереди
+        else nodeColors[n] = '#3e3e42';
+    }
+
+    draw(svg, nodes, edges, true, nodeColors, step.forward_dist, activeEdge, null, nodeLabels, null, null, null, null);
+
+    const lines = [];
+    const actLabels = {
+        'init': 'Инициализация', 'forward_expand': 'Расширение вперёд',
+        'backward_expand': 'Расширение назад', 'relax': 'Релаксация',
+        'meet': 'Фронты встретились!', 'reconstruct': 'Восстановление пути', 'no_path': 'Путь не найден'
+    };
+    lines.push(`<span class="label">Действие:</span> <span class="value">${actLabels[step.action] || step.action}</span>`);
+    if (step.current_node !== null) lines.push(`<span class="label">Вершина:</span> <span class="value">${getNodeLabel(step.current_node, nodeLabels)}</span>`);
+    if (step.total_cost !== null && !isNaN(step.total_cost)) lines.push(`<span class="label">Стоимость:</span> <span class="value">${step.total_cost.toFixed(2)}</span>`);
+    if (step.path_found && step.current_path.length > 0) {
+        lines.push(`<span class="label">Путь:</span> <span class="value">${step.current_path.map(n => getNodeLabel(n, nodeLabels)).join(' → ')}</span>`);
+    }
+    lines.push(`<span class="label">Фронты:</span> <span class="value">F: ${fOpen.size} | B: ${bOpen.size}</span>`);
+    return lines.join('<br>');
+}

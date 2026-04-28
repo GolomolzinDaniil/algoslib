@@ -86,3 +86,24 @@ struct OrientedGraph {
         return (it != adjacency_list.end()) ? it->second : empty;
     }
 };
+
+// Ориентированный взвешенный граф для A* и других алгоритмов поиска пути
+struct Directed_Weighted_Graph {
+    std::unordered_map<int, std::vector<std::pair<int, double>>> adjacency_list;
+
+    // Добавляет направленное взвешенное ребро u -> v
+    void add_edge(int u, int v, double weight) {
+        adjacency_list[u].emplace_back(v, weight);
+        // Гарантируем, что целевая вершина существует в словаре
+        if (adjacency_list.find(v) == adjacency_list.end()) {
+            adjacency_list[v] = {};
+        }
+    }
+
+    // Возвращает список исходящих рёбер с весами
+    const std::vector<std::pair<int, double>>& get_neighbors(int u) const {
+        static const std::vector<std::pair<int, double>> empty;
+        auto it = adjacency_list.find(u);
+        return (it != adjacency_list.end()) ? it->second : empty;
+    }
+};

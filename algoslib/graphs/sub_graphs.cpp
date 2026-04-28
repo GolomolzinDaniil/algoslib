@@ -11,6 +11,10 @@
 #include "edmonds_karp.hpp"
 #include "hierholzer.hpp"
 #include "hamiltonian.hpp"
+#include "tarjan.hpp"
+#include "kosaraju.hpp"
+#include "astar.hpp"
+#include "bidijkstra.hpp"
 
 namespace py = pybind11;
 
@@ -224,4 +228,139 @@ PYBIND11_MODULE(sub_graphs, m) {
           "Перебор с возвратом для поиска гамильтонова пути или цикла. "
           "find_cycle=True ищет гамильтонов цикл (с возвратом в start_node). "
           "Возвращает список шагов (List[Hamiltonian_Step]).");
+
+
+     py::class_<Tarjan_Step>(m, "Tarjan_Step")
+        .def_readonly("current_node", &Tarjan_Step::current_node,
+                      "Текущая обрабатываемая вершина")
+        .def_readonly("stack", &Tarjan_Step::stack,
+                      "Стек DFS: список вершин в текущем пути")
+        .def_readonly("index_map", &Tarjan_Step::index_map,
+                      "Словарь {node_id: discovery_index}")
+        .def_readonly("lowlink_map", &Tarjan_Step::lowlink_map,
+                      "Словарь {node_id: lowlink_value}")
+        .def_readonly("on_stack_nodes", &Tarjan_Step::on_stack_nodes,
+                      "Список вершин, находящихся на стеке")
+        .def_readonly("edge_from", &Tarjan_Step::edge_from,
+                      "Исходная вершина исследуемого ребра (-1 если нет)")
+        .def_readonly("edge_to", &Tarjan_Step::edge_to,
+                      "Целевая вершина исследуемого ребра (-1 если нет)")
+        .def_readonly("edge_type", &Tarjan_Step::edge_type,
+                      "Тип ребра: 'tree', 'back', 'cross', 'forward', 'none'")
+        .def_readonly("completed_sccs", &Tarjan_Step::completed_sccs,
+                      "Список уже найденных компонент связности: List[List[int]]")
+        .def_readonly("current_scc", &Tarjan_Step::current_scc,
+                      "Компонента, извлекаемая из стека на этом шаге: List[int]")
+        .def_readonly("action", &Tarjan_Step::action,
+                      "Тип действия: 'visit', 'explore_edge', 'update_lowlink', 'found_scc', 'done'")
+        .def_readonly("index_counter", &Tarjan_Step::index_counter,
+                      "Текущее значение счётчика индексов");
+
+    py::class_<OrientedGraph>(m, "OrientedGraph")
+        .def(py::init<>())
+        .def("add_edge", &OrientedGraph::add_edge, py::arg("u"), py::arg("v"),
+             "Добавить направленное ребро u -> v")
+        .def("get_neighbors", &OrientedGraph::get_neighbors,
+             "Получить список исходящих соседей вершины");
+
+    m.def("tarjan_scc", &tarjan_scc, py::arg("graph"),
+          "Алгоритм Тарьяна для поиска сильно связных компонент (SCC). "
+          "Возвращает список шагов для визуализации.");
+
+    py::class_<Kosaraju_Step>(m, "Kosaraju_Step")
+        .def_readonly("phase", &Kosaraju_Step::phase,
+                      "Номер фазы: 1=DFS исходный, 2=транспонирование, 3=DFS транспонированный")
+        .def_readonly("current_node", &Kosaraju_Step::current_node,
+                      "Текущая вершина")
+        .def_readonly("stack", &Kosaraju_Step::stack,
+                      "Стек DFS")
+        .def_readonly("finish_order", &Kosaraju_Step::finish_order,
+                      "Порядок завершения вершин (после фазы 1)")
+        .def_readonly("processing_order", &Kosaraju_Step::processing_order,
+                      "Порядок обработки в фазе 3")
+        .def_readonly("edge_from", &Kosaraju_Step::edge_from,
+                      "Исследуемое ребро: from")
+        .def_readonly("edge_to", &Kosaraju_Step::edge_to,
+                      "Исследуемое ребро: to")
+        .def_readonly("completed_sccs", &Kosaraju_Step::completed_sccs,
+                      "Найденные компоненты: List[List[int]]")
+        .def_readonly("current_scc", &Kosaraju_Step::current_scc,
+                      "Извлекаемая компонента сейчас")
+        .def_readonly("action", &Kosaraju_Step::action,
+                      "Действие: 'start_dfs1', 'visit', 'finish', 'transpose', 'start_dfs2', 'found_scc', 'done'")
+        .def_readonly("is_transposed_edge", &Kosaraju_Step::is_transposed_edge,
+                      "Является ли ребро транспонированным (bool)");
+    
+    m.def("kosaraju_scc",
+          &kosaraju_scc,
+          py::arg("graph"),
+          "Алгоритм Косараджу для поиска сильно связных компонент. "
+          "Возвращает список шагов (List[Kosaraju_Step]) для визуализации.");
+
+    
+        py::class_<Directed_Weighted_Graph>(m, "Directed_Weighted_Graph")
+        .def(py::init<>())
+        .def("add_edge", 
+             &Directed_Weighted_Graph::add_edge, 
+             py::arg("u"), py::arg("v"), py::arg("weight"),
+             "Добавить направленное взвешенное ребро u -> v")
+        .def("get_neighbors", 
+             &Directed_Weighted_Graph::get_neighbors,
+             "Вернуть список исходящих соседей с весами: List[Tuple[int, float]]");
+
+    py::class_<AStar_Step>(m, "AStar_Step")
+        .def_readonly("current_node", &AStar_Step::current_node,
+                      "Текущая обрабатываемая вершина")
+        .def_readonly("open_set", &AStar_Step::open_set,
+                      "Вершины в очереди приоритетов: List[int]")
+        .def_readonly("closed_set", &AStar_Step::closed_set,
+                      "Посещённые вершины: List[int]")
+        .def_readonly("g_scores", &AStar_Step::g_scores,
+                      "Стоимость от старта: {node: float}")
+        .def_readonly("h_scores", &AStar_Step::h_scores,
+                      "Эвристика до цели: {node: float}")
+        .def_readonly("f_scores", &AStar_Step::f_scores,
+                      "Суммарная оценка: {node: float} (g + h)")
+        .def_readonly("came_from", &AStar_Step::came_from,
+                      "Родитель для восстановления пути: {node: parent}")
+        .def_readonly("edge_from", &AStar_Step::edge_from,
+                      "Исследуемое ребро: from")
+        .def_readonly("edge_to", &AStar_Step::edge_to,
+                      "Исследуемое ребро: to")
+        .def_readonly("current_path", &AStar_Step::current_path,
+                      "Текущий путь от старта: List[int]")
+        .def_readonly("path_found", &AStar_Step::path_found,
+                      "Найден ли путь к цели (bool)")
+        .def_readonly("action", &AStar_Step::action,
+                      "Действие: 'init', 'expand', 'relax', 'found', 'no_path'");
+
+    m.def("astar_pathfinding",
+          &astar_pathfinding,
+          py::arg("graph"), py::arg("start"), py::arg("goal"), 
+          py::arg("node_coords") = std::unordered_map<int, std::pair<double, double>>{},
+          "Алгоритм A* для поиска кратчайшего пути. "
+          "Возвращает список шагов (List[AStar_Step]) для визуализации. "
+          "Опционально принимает координаты вершин для эвристики.");
+
+    py::class_<BiDijkstra_Step>(m, "BiDijkstra_Step")
+        .def_readonly("phase", &BiDijkstra_Step::phase)
+        .def_readonly("current_node", &BiDijkstra_Step::current_node)
+        .def_readonly("forward_open", &BiDijkstra_Step::forward_open)
+        .def_readonly("forward_closed", &BiDijkstra_Step::forward_closed)
+        .def_readonly("backward_open", &BiDijkstra_Step::backward_open)
+        .def_readonly("backward_closed", &BiDijkstra_Step::backward_closed)
+        .def_readonly("forward_dist", &BiDijkstra_Step::forward_dist)
+        .def_readonly("backward_dist", &BiDijkstra_Step::backward_dist)
+        .def_readonly("forward_parent", &BiDijkstra_Step::forward_parent)
+        .def_readonly("backward_parent", &BiDijkstra_Step::backward_parent)
+        .def_readonly("edge_from", &BiDijkstra_Step::edge_from)
+        .def_readonly("edge_to", &BiDijkstra_Step::edge_to)
+        .def_readonly("action", &BiDijkstra_Step::action)
+        .def_readonly("path_found", &BiDijkstra_Step::path_found)
+        .def_readonly("current_path", &BiDijkstra_Step::current_path)
+        .def_readonly("total_cost", &BiDijkstra_Step::total_cost);
+
+    m.def("bidijkstra", &bidijkstra,
+          py::arg("graph"), py::arg("source"), py::arg("target"),
+          "Би-дейкстра: поиск кратчайшего пути двумя фронтами. Возвращает List[BiDijkstra_Step].");
 }

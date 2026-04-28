@@ -119,6 +119,8 @@
                         <option value="kosaraju">Kosaraju (SCC)</option>
                         <option value="hierholzer">Hierholzer (Эйлеров путь/цикл)</option>
                         <option value="hamiltonian">Hamiltonian (Backtracking)</option>
+                        <option value="astar">A* Pathfinding</option>
+                        <option value="bidijkstra">Bi-Dijkstra (двусторонний)</option>
                     </select>
                 </div>
                 <div class="input-row vertical">
@@ -132,6 +134,10 @@ D E</textarea>
                 <div class="input-row">
                     <label>Начальная вершина:</label>
                     <input type="text" id="graph-start" value="A" placeholder="A" maxlength="3">
+                </div>
+                 <div id="goal-field" class='input-row' style="display: none;">
+                    <label for="graph-goal">Целевая вершина:</label>
+                    <input type="text" id="graph-goal" value="F" placeholder="F" maxlength="3">
                 </div>
                 <div id="sink-field" class="input-row" style="display: none;">
                     <label for="graph-sink">Сток (sink):</label>

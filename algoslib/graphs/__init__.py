@@ -49,6 +49,28 @@ except ImportError:
     Hamiltonian_Step = None
     hamiltonian_backtracking = None
 
+try:
+    from .sub_graphs import Tarjan_Step, tarjan_scc, OrientedGraph
+except ImportError:
+    Tarjan_Step = None
+    tarjan_scc = None
+    OrientedGraph = None
+
+try:
+    from .sub_graphs import Kosaraju_Step, kosaraju_scc
+except ImportError:
+    Kosaraju_Step = None
+    kosaraju_scc = None
+
+try:
+    from .sub_graphs import Directed_Weighted_Graph, AStar_Step, astar_pathfinding, BiDijkstra_Step, bidijkstra
+except ImportError:
+    Directed_Weighted_Graph = None
+    AStar_Step = None
+    astar_pathfinding = None
+    BiDijkstra_Step = None
+    bidijkstra = None
+
 __all__ = ['bfs', 'Graph', 'BFS_Step', 'Weighted_Graph', 'Dijkstra_Step', 'dijkstra',
            'Ford_Step', 'bellman_ford', 'Kruskal_Step', 'kruskal',
            'Stalin_Step', 'stalin_sort',
@@ -56,4 +78,7 @@ __all__ = ['bfs', 'Graph', 'BFS_Step', 'Weighted_Graph', 'Dijkstra_Step', 'dijks
            'EdmondsKarp_Step', 'EdmondsKarp_Result', 'edmonds_karp',
            'Hierholzer_Step', 'hierholzer',
            'Hamiltonian_Step', 'hamiltonian_backtracking',
+           'Tarjan_Step', 'tarjan_scc', 'OrientedGraph', 'Kosaraju_Step', 'kosaraju_scc',
+           'Directed_Weighted_Graph', 'AStar_Step', 'astar_pathfinding',
+           'BiDijkstra_Step', 'bidijkstra',
           ]
