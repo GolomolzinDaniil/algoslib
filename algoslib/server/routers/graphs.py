@@ -56,6 +56,17 @@ class HamiltonianRequest(BaseModel):
     start_node: str
     find_cycle: bool = False
 
+class AStarRequest(BaseModel):
+    edges: list[list[str]]       
+    start_node: str              
+    goal_node: str                
+    node_coords: list[list[str]] = []
+
+class BiDijkstraRequest(BaseModel):
+    edges: list[list[str]]
+    start_node: str
+    goal_node: str
+
 
 def _normalize_label(value: str) -> str:
     label = str(value).strip()
@@ -736,4 +747,145 @@ async def run_kosaraju(req: KosarajuRequest):
     except Exception as e:
         import traceback
         traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+    
+@router.post("/astar")
+async def run_astar(req: AStarRequest):
+    try:
+        from algoslib.graphs import Directed_Weighted_Graph, astar_pathfinding
+
+        if astar_pathfinding is None:
+            raise HTTPException(
+                status_code=501,
+                detail="A* недоступен. Пересоберите sub_graphs: python setup.py build_ext --inplace",
+            )
+
+        label_to_id, node_labels = _build_label_maps_no_start(req.edges)
+        parsed_edges = _parse_weighted_edges(req.edges, label_to_id)
+
+        # Парсим координаты для эвристики (если заданы)
+        node_coords = {}
+        for coord_entry in req.node_coords:
+            if len(coord_entry) >= 3:
+                label = _normalize_label(coord_entry[0])
+                if label in label_to_id:
+                    node_id = label_to_id[label]
+                    try:
+                        x = float(coord_entry[1])
+                        y = float(coord_entry[2])
+                        node_coords[node_id] = (x, y)
+                    except (ValueError, IndexError):
+                        pass
+
+        # Создаём ориентированный взвешенный граф
+        graph = Directed_Weighted_Graph()
+        nodes = set()
+        for u, v, w in parsed_edges:
+            graph.add_edge(u, v, w)  # Только u -> v
+            nodes.add(u)
+            nodes.add(v)
+
+        start_id = label_to_id.get(req.start_node)
+        goal_id = label_to_id.get(req.goal_node)
+        
+        if start_id is None:
+            raise HTTPException(status_code=400, detail=f"Старт '{req.start_node}' не найден")
+        if goal_id is None:
+            raise HTTPException(status_code=400, detail=f"Цель '{req.goal_node}' не найден")
+
+        steps = astar_pathfinding(graph, start_id, goal_id, node_coords)
+
+        # Конвертируем шаги в JSON-совместимый формат
+        result_steps = []
+        for step in steps:
+            def safe_float(d):
+                return {str(k): (None if math.isinf(v) else float(v)) for k, v in d.items()}
+            
+            result_steps.append({
+                "current_node": int(step.current_node) if step.current_node != -1 else None,
+                "open_set": [int(x) for x in step.open_set],
+                "closed_set": [int(x) for x in step.closed_set],
+                "g_scores": safe_float(step.g_scores),
+                "h_scores": safe_float(step.h_scores),
+                "f_scores": safe_float(step.f_scores),
+                "came_from": {str(k): int(v) for k, v in step.came_from.items()},
+                "edge_from": int(step.edge_from) if step.edge_from != -1 else None,
+                "edge_to": int(step.edge_to) if step.edge_to != -1 else None,
+                "current_path": [int(x) for x in step.current_path],
+                "path_found": bool(step.path_found),
+                "action": step.action,
+            })
+
+        return {
+            "steps": result_steps,
+            "edges": parsed_edges,
+            "nodes": sorted(nodes),
+            "node_labels": node_labels,
+            "algorithm": "astar",
+            "start": start_id,
+            "goal": goal_id,
+            "node_coords": {str(k): list(v) for k, v in node_coords.items()},
+        }
+        
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+    
+@router.post("/bidijkstra")
+async def run_bidijkstra(req: BiDijkstraRequest):
+    try:
+        from algoslib.graphs import Directed_Weighted_Graph, bidijkstra
+        if bidijkstra is None:
+            raise HTTPException(status_code=501, detail="BiDijkstra недоступен.")
+
+        label_to_id, node_labels = _build_label_maps_no_start(req.edges)
+        parsed_edges = _parse_weighted_edges(req.edges, label_to_id)
+
+        graph = Directed_Weighted_Graph()
+        nodes = set()
+        for u, v, w in parsed_edges:
+            graph.add_edge(u, v, w)
+            nodes.add(u); nodes.add(v)
+
+        src = label_to_id.get(req.start_node)
+        tgt = label_to_id.get(req.goal_node)
+        if src is None or tgt is None:
+            raise HTTPException(status_code=400, detail="Старт или цель не найдены")
+
+        steps = bidijkstra(graph, src, tgt)
+
+        result_steps = []
+        for step in steps:
+            def safe(d): return {str(k): (None if math.isinf(v) else float(v)) for k,v in d.items()}
+            result_steps.append({
+                "phase": step.phase,
+                "current_node": int(step.current_node) if step.current_node != -1 else None,
+                "forward_open": [int(x) for x in step.forward_open],
+                "forward_closed": [int(x) for x in step.forward_closed],
+                "backward_open": [int(x) for x in step.backward_open],
+                "backward_closed": [int(x) for x in step.backward_closed],
+                "forward_dist": safe(step.forward_dist),
+                "backward_dist": safe(step.backward_dist),
+                "forward_parent": {str(k):int(v) for k,v in step.forward_parent.items()},
+                "backward_parent": {str(k):int(v) for k,v in step.backward_parent.items()},
+                "edge_from": int(step.edge_from) if step.edge_from != -1 else None,
+                "edge_to": int(step.edge_to) if step.edge_to != -1 else None,
+                "action": step.action,
+                "path_found": step.path_found,
+                "current_path": [int(x) for x in step.current_path],
+                "total_cost": float(step.total_cost) if not math.isinf(step.total_cost) else None,
+            })
+
+        return {
+            "steps": result_steps, "edges": parsed_edges, "nodes": sorted(nodes),
+            "node_labels": node_labels, "algorithm": "bidijkstra", "start": src, "goal": tgt
+        }
+    except HTTPException: raise
+    except Exception as e:
+        import traceback; traceback.print_exc()
         return JSONResponse(status_code=500, content={"detail": str(e)})

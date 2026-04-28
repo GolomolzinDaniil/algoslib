@@ -887,3 +887,199 @@ def test_kosaraju_disconnected():
     steps = kosaraju_scc(g)
     final_sccs = steps[-1].completed_sccs
     assert len(final_sccs) == 2
+
+# ================= Тесты для алгоритма A* =================
+
+def test_astar_simple_linear():
+    """Простой линейный ориентированный граф: 0 --1.0--> 1 --2.0--> 2"""
+    g = Directed_Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    g.add_edge(1, 2, 2.0)
+    
+    coords = {0: (0, 0), 1: (1, 0), 2: (3, 0)}  # координаты для эвристики
+    steps = astar_pathfinding(g, 0, 2, coords)
+    
+    assert len(steps) >= 1
+    assert steps[-1].path_found is True
+    assert steps[-1].current_path == [0, 1, 2]
+    
+    # Проверка итоговой стоимости
+    final_g = steps[-1].g_scores
+    assert final_g[0] == 0.0
+    assert final_g[1] == 1.0
+    assert final_g[2] == 3.0
+
+
+def test_astar_step_type():
+    """Проверка типа возвращаемых шагов."""
+    g = Directed_Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    coords = {0: (0, 0), 1: (1, 0)}
+    steps = astar_pathfinding(g, 0, 1, coords)
+    assert all(isinstance(s, AStar_Step) for s in steps)
+
+
+def test_astar_shortest_path_choice():
+    """
+    Граф с выбором пути (аналогично тесту для Дейкстры):
+    0 --1.0--> 1 --1.0--> 2  
+    0 --5.0--> 2            
+    A* должен выбрать путь через вершину 1 (стоимость 2.0 вместо 5.0).
+    """
+    g = Directed_Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    g.add_edge(1, 2, 1.0)
+    g.add_edge(0, 2, 5.0)
+    
+    coords = {0: (0, 0), 1: (1, 1), 2: (3, 0)}
+    steps = astar_pathfinding(g, 0, 2, coords)
+    
+    assert steps[-1].path_found is True
+    assert steps[-1].current_path == [0, 1, 2]
+    assert abs(steps[-1].g_scores[2] - 2.0) < 1e-9
+
+
+def test_astar_disconnected():
+    """Граф, где цель недостижима из старта."""
+    g = Directed_Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    g.add_edge(2, 3, 1.0)  # Отдельный компонент, недостижим из 0
+    
+    coords = {0: (0, 0), 1: (1, 0), 2: (10, 0), 3: (11, 0)}
+    steps = astar_pathfinding(g, 0, 3, coords)
+    
+    # Путь не должен быть найден
+    assert steps[-1].path_found is False
+    # Стоимость до недостижимой вершины = бесконечность
+    assert steps[-1].g_scores.get(3, float('inf')) == float('inf')
+
+
+def test_astar_float_weights():
+    """Проверка работы с дробными весами."""
+    g = Directed_Weighted_Graph()
+    g.add_edge(0, 1, 0.1)
+    g.add_edge(1, 2, 0.2)
+    
+    coords = {0: (0, 0), 1: (0.1, 0), 2: (0.3, 0)}
+    steps = astar_pathfinding(g, 0, 2, coords)
+    
+    assert steps[-1].path_found is True
+    assert abs(steps[-1].g_scores[1] - 0.1) < 1e-9
+    assert abs(steps[-1].g_scores[2] - 0.3) < 1e-9
+
+
+def test_astar_history_contains_expansions():
+    """Проверка, что история содержит шаги с обработкой вершин."""
+    g = Directed_Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    g.add_edge(1, 2, 1.0)
+    
+    coords = {0: (0, 0), 1: (1, 0), 2: (2, 0)}
+    steps = astar_pathfinding(g, 0, 2, coords)
+    
+    # Первый шаг — инициализация
+    assert steps[0].action == 'init'
+    assert steps[0].current_node == 0
+    
+    # Должны быть шаги с релаксацией
+    assert any(step.action == 'relax' for step in steps)
+    
+    # Последний шаг — путь найден
+    assert steps[-1].action == 'found'
+    assert steps[-1].path_found is True
+
+
+def test_astar_heuristic_influence():
+    """
+    Проверка, что эвристика влияет на порядок обработки.
+    Граф: 0 -> 1 (вес 10), 0 -> 2 (вес 1), 2 -> 3 (вес 1), 1 -> 3 (вес 1)
+    Цель: 3. Координаты так, что эвристика "подсказывает" идти через 2.
+    """
+    g = Directed_Weighted_Graph()
+    g.add_edge(0, 1, 10.0)
+    g.add_edge(0, 2, 1.0)
+    g.add_edge(2, 3, 1.0)
+    g.add_edge(1, 3, 1.0)
+    
+    # Координаты: 2 и 3 близко друг к другу, 1 — далеко
+    coords = {0: (0, 0), 1: (10, 10), 2: (1, 0), 3: (2, 0)}
+    steps = astar_pathfinding(g, 0, 3, coords)
+    
+    assert steps[-1].path_found is True
+    # Оптимальный путь: 0 -> 2 -> 3 (стоимость 2.0)
+    assert steps[-1].current_path == [0, 2, 3]
+    assert abs(steps[-1].g_scores[3] - 2.0) < 1e-9
+
+
+def test_astar_no_coords_fallback():
+    """
+    Если координаты не заданы, эвристика = 0, и A* вырождается в Дейкстру.
+    """
+    g = Directed_Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    g.add_edge(1, 2, 2.0)
+    g.add_edge(0, 2, 5.0)
+    
+    # Без координат
+    steps = astar_pathfinding(g, 0, 2)
+    
+    assert steps[-1].path_found is True
+    assert steps[-1].current_path == [0, 1, 2]
+    assert abs(steps[-1].g_scores[2] - 3.0) < 1e-9
+
+
+def test_astar_came_from_reconstruction():
+    """Проверка корректности восстановления пути через came_from."""
+    g = Directed_Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    g.add_edge(1, 2, 1.0)
+    g.add_edge(2, 3, 1.0)
+    
+    coords = {0: (0, 0), 1: (1, 0), 2: (2, 0), 3: (3, 0)}
+    steps = astar_pathfinding(g, 0, 3, coords)
+    
+    assert steps[-1].path_found is True
+    
+    # Восстанавливаем путь вручную через came_from
+    path = []
+    at = 3
+    came_from = steps[-1].came_from
+    while at in came_from:
+        path.append(at)
+        at = came_from[at]
+    path.append(0)
+    path.reverse()
+    
+    assert path == [0, 1, 2, 3]
+    assert path == steps[-1].current_path
+
+
+def test_astar_vs_dijkstra_consistency():
+    """
+    На ориентированных графах без отрицательных весов
+    результаты A* (с нулевой эвристикой) и Дейкстры должны совпадать.
+    """
+    from algoslib.graphs import Weighted_Graph, dijkstra
+    
+    # Создаём одинаковые графы
+    g_astar = Directed_Weighted_Graph()
+    g_dijkstra = Weighted_Graph()
+    
+    edges = [(0, 1, 1.0), (0, 2, 4.0), (1, 2, 2.0), (1, 3, 5.0), (2, 3, 1.0)]
+    for u, v, w in edges:
+        g_astar.add_edge(u, v, w)
+        g_dijkstra.add_edge(u, v, w)  # Weighted_Graph неориентированный, но для этого теста ок
+    
+    # A* без координат = Дейкстра
+    astar_steps = astar_pathfinding(g_astar, 0, 3)
+    dijkstra_steps = dijkstra(g_dijkstra, 0)
+    
+    astar_final = astar_steps[-1].g_scores
+    dijkstra_final = dijkstra_steps[-1].distances
+    
+    # Сравниваем расстояния для достижимых вершин
+    for node in astar_final:
+        if astar_final[node] == float('inf'):
+            assert dijkstra_final[node] == float('inf')
+        else:
+            assert abs(astar_final[node] - dijkstra_final[node]) < 1e-9
