@@ -1,9 +1,7 @@
-#pragma once
+#include "knuth_morris_pratt.hpp"
 
 #include <vector>
 #include <string>
-
-#include "knuth_morris_pratt.hpp"
 
 
 std::vector<size_t> lps_func(const std::string& str)
@@ -32,9 +30,9 @@ std::vector<size_t> lps_func(const std::string& str)
     return lps;
 }
 
-std::vector<KMP_step> kmp_h(const std::string& text, const std::string& pattern)
+std::vector<Sub_step> kmp_h(const std::string& text, const std::string& pattern)
 {
-    std::vector<KMP_step> history;
+    std::vector<Sub_step> history;
     std::vector<size_t> lps = lps_func(pattern);
 
     const size_t text_size = text.size();
@@ -148,5 +146,4 @@ size_t kmp(const std::string& str, const std::string& pattern)
 //     }
 //     return history;
 // }
-
 

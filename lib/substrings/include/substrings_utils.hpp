@@ -6,12 +6,22 @@
 #include <string>
 #include <utility>
 
-#include "knuth_morris_pratt.hpp"
-
 namespace py = pybind11;
 
+struct Sub_step
+{
+    size_t text_idx;
+    size_t pattern_idx;
+    bool is_match;
+    bool is_found;
+    size_t found_pos;
+    bool is_backtrack;
+    size_t lps_value;
+};
 
-inline py::list to_py(const std::vector<KMP_step>& history)
+using KMP_step = Sub_step;
+
+inline py::list to_py(const std::vector<Sub_step>& history)
 {
     py::list res;
     for (const auto& step : history)

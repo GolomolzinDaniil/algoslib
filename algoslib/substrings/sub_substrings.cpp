@@ -1,6 +1,7 @@
 #include "substrings_utils.hpp"
 #include "knuth_morris_pratt.hpp"
 #include "boyer_moore.hpp"
+#include "quick_search.hpp"
 
 namespace py = pybind11;
 
@@ -51,6 +52,33 @@ PYBIND11_MODULE(sub_substrings, m)
         [](const std::string& text, const std::string& pattern) {
             size_t res = get_index([&](const std::string& t) {
                 return boyer_moore(t, pattern);
+            }, text);
+
+            if (res == std::string::npos) {
+                return -1;
+            }
+            return static_cast<int>(res);
+        },
+        py::arg("text"),
+        py::arg("pattern")
+    );
+
+    m.def(
+        "quick_search_h",
+        [](const std::string& text, const std::string& pattern) {
+            return get_history([&](const std::string& t) {
+                return quick_search_h(t, pattern);
+            }, text);
+        },
+        py::arg("text"),
+        py::arg("pattern")
+    );
+
+    m.def(
+        "quick_search",
+        [](const std::string& text, const std::string& pattern) {
+            size_t res = get_index([&](const std::string& t) {
+                return quick_search(t, pattern);
             }, text);
 
             if (res == std::string::npos) {

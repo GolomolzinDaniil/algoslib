@@ -11,6 +11,7 @@ except Exception:
 # Используем kmp_h, так как он возвращает список шагов (историю)
 kmp_h_cpp = getattr(sub_substrings_cpp, "kmp_h", None) if sub_substrings_cpp else None
 boyer_moore_h_cpp = getattr(sub_substrings_cpp, "boyer_moore_h", None) if sub_substrings_cpp else None
+quick_search_h_cpp = getattr(sub_substrings_cpp, "quick_search_h", None) if sub_substrings_cpp else None
 
 router = APIRouter()
 
@@ -77,3 +78,7 @@ async def run_kmp(req: KMPRequest):
 @router.post("/boyer_moore")
 async def run_boyer_moore(req: KMPRequest):
     return _run_substring_history(req, boyer_moore_h_cpp, "Boyer-Moore Viz")
+
+@router.post("/quick_search")
+async def run_quick_search(req: KMPRequest):
+    return _run_substring_history(req, quick_search_h_cpp, "Sunday / Quick Search Viz")

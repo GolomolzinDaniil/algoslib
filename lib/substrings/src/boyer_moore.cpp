@@ -22,9 +22,9 @@ std::array<int, 256> build_bad_char_table(const std::string& pattern)
 }
 }
 
-std::vector<KMP_step> boyer_moore_h(const std::string& text, const std::string& pattern)
+std::vector<Sub_step> boyer_moore_h(const std::string& text, const std::string& pattern)
 {
-    std::vector<KMP_step> history;
+    std::vector<Sub_step> history;
 
     const size_t text_size = text.size();
     const size_t pattern_size = pattern.size();

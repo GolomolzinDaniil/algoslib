@@ -1,14 +1,16 @@
 import pytest
 
-# можно добавить и bogo_sort но тесты будут ложиться раз через раз
+
 from algoslib.substrings.sub_substrings import (
     kmp,
-    boyer_moore
+    boyer_moore,
+    quick_search
 )    
 
 ALGORITHMS = (
     kmp,
     boyer_moore,
+    quick_search,
 )
 
 @pytest.mark.parametrize("func", ALGORITHMS)

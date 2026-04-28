@@ -67,6 +67,12 @@ const SUBSTRING_META = {
         desc: "Сравнивает паттерн справа налево и сдвигает его по правилу плохого символа",
         time: "Время: O(NM) в худшем, быстрее на практике",
         memory: "Память: O(Σ)",
+    },
+    quick_search: {
+        title: "Sunday / Quick Search",
+        desc: "Сравнивает окно слева направо, а сдвиг выбирает по символу сразу после окна",
+        time: "Время: O(NM) в худшем, быстрее на практике",
+        memory: "Память: O(Σ)",
     }
 };
 
@@ -1930,6 +1936,9 @@ if (substringExampleBtn) {
         if (algo === 'boyer_moore') {
             textInput.value = "HEREISASIMPLE";
             patternInput.value = "SIMPLE";
+        } else if (algo === 'quick_search') {
+            textInput.value = "abracadabra";
+            patternInput.value = "cad";
         } else {
             textInput.value = "ABABDABACDABABC";
             patternInput.value = "ABABC";

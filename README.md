@@ -1,129 +1,197 @@
-## algoslib - визуализация алгоритмов
+# algoslib
 
-C++ реализации алгоритмов с интерактивной визуализацией через веб-интерфейс.
+Интерактивная библиотека визуализации алгоритмов: C++ под капотом, Python/FastAPI в роли сервера и браузерный интерфейс для пошагового просмотра.
 
-### Установка
+Проект сделан как учебная лаборатория, где алгоритм можно не просто запустить, а реально увидеть: какие элементы сравниваются, куда двигается указатель, как меняется состояние графа или почему поиск подстроки сделал именно такой сдвиг.
+
+## Что внутри
+
+- Быстрые реализации алгоритмов на C++.
+- Python bindings через `pybind11`.
+- FastAPI-сервер с JSON API.
+- Веб-интерфейс с плеером шагов: назад, вперед, старт, пауза, скорость.
+- Тесты для проверки корректности алгоритмов.
+- Нормальная структура, чтобы добавлять новые алгоритмы без боли.
+
+## Алгоритмы
+
+### Сортировки
+
+- Bubble Sort
+- Selection Sort
+- Gnome Sort
+- Bogo Sort
+- Quick Sort
+- Insertion Sort
+- Counting Sort
+
+### Поиск
+
+- Linear Search
+- Bilinear Search
+- Binary Search
+
+### Графы
+
+- BFS
+- Dijkstra
+- Bellman-Ford
+- Kruskal
+- Ford-Fulkerson
+- Edmonds-Karp
+- Tarjan
+- Kosaraju
+- Stalin Sort для графовой секции проекта
+
+### Подстроки
+
+- Knuth-Morris-Pratt
+- Boyer-Moore
+
+## Быстрый старт
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
+
 pip install -r requirements.txt
-```
-
-### Сборка C++ модулей
-
-```bash
 python setup.py build_ext --inplace
-```
-
-быстрый старт (установка + сборка + тесты)
-```bash
-pip install -r requirements.txt && python setup.py build_ext --inplace && pytest tests/
-```
-
-### Запуск веб-сервера
-
-```bash
 python -m algoslib.server
 ```
 
-Откроется на http://127.0.0.1:8000
+После запуска открой:
 
-На сайте можно выбрать алгоритм, ввести данные и запустить визуализацию прямо в браузере.
+```text
+http://127.0.0.1:8000
+```
 
-### Запуск тестов
+## Проверка проекта
+
+Запустить все тесты:
 
 ```bash
 pytest tests/
 ```
 
-### Структура проекта
-
-```
-algoslib/
-  sorting/             - алгоритмы сортировки
-    sub_sorting.cpp    - pybind11 биндинги
-    visual.py          - генерация HTML (legacy)
-    templates/         - HTML шаблоны (legacy)
-  graphs/              - алгоритмы на графах
-    sub_graphs.cpp     - pybind11 биндинги
-  server/              - FastAPI сервер + фронтенд
-    app.py             - точка входа FastAPI
-    routers/
-      sorting.py       - API для сортировок
-      graphs.py        - API для графов
-    static/
-      index.html       - SPA страница
-      css/style.css    - стили
-      js/
-        app.js         - контроллер (табы, fetch, плеер)
-        sorting-viz.js - рендеринг сортировок
-        graph-viz.js   - рендеринг графов (SVG)
-lib/
-  sorting/include/     - C++ реализации сортировок
-  graphs/include/      - C++ реализации графовых алгоритмов
-  graphs/src/          - C++ исходники (bfs, dijkstra)
-  bindings/include/    - утилиты для pybind11 (type_dispatcher)
-```
-
-### Как добавить новый алгоритм
-
-#### 1. C++ реализация
-
-Добавить заголовочный файл в `lib/<категория>/include/` и при необходимости `.cpp` в `lib/<категория>/src/`.
-
-Алгоритм должен возвращать вектор структур-шагов (history), описывающих каждое действие. Пример для сортировки - `Step` из `sorting_utils.hpp`, для графов - `BFS_Step`, `Dijkstra_Step` из `graph_utils.hpp`.
-
-#### 2. Pybind11 биндинг
-
-Добавить биндинг в соответствующий `sub_*.cpp` файл (например `algoslib/sorting/sub_sorting.cpp`).
-
-Для сортировок используется `type_dispatcher` из `bind_func.hpp` - он автоматически обрабатывает numpy массивы и python списки.
-
-Для графов биндинг делается напрямую через pybind11 классы и функции.
-
-После добавления - пересобрать: `python setup.py build_ext --inplace`
-
-#### 3. API endpoint
-
-Добавить endpoint в соответствующий файл роутера (`algoslib/server/routers/sorting.py` или `graphs.py`).
-
-Пример для сортировки:
-```python
-@router.post("/my_sort")
-async def run_my_sort(req: SortRequest):
-    data = list(req.data[:MAX_SIZE])
-    arr = np.array(data)
-    history = [dict(s) for s in my_sort(arr)]
-    return {"history": history, "initial_array": data}
-```
-
-Пример для графового алгоритма:
-```python
-@router.post("/my_algo")
-async def run_my_algo(req: BFSRequest):
-    from algoslib.graphs import Graph, my_algo
-    graph = Graph()
-    nodes = set()
-    for edge in req.edges:
-        graph.add_edge(edge[0], edge[1])
-        nodes.add(edge[0])
-        nodes.add(edge[1])
-    steps = my_algo(graph, req.start_node)
-    result_steps = [{"current_node": int(s.current_node), ...} for s in steps]
-    return {"steps": result_steps, "edges": req.edges, "nodes": sorted(nodes)}
-```
-
-#### 4. Фронтенд
-
-- Добавить `<option>` в `<select>` в `index.html`
-- Если визуализация аналогична существующей (ячейки для сортировки, SVG для графов) - больше ничего не нужно, фронтенд универсальный
-- Если нужен новый тип визуализации - добавить JS модуль в `static/js/` и подключить в `app.js`
-
-### Для Linux
+Или коротко:
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
+python setup.py build_ext --inplace && pytest -q
 ```
-#### Для очистки (может решить проблему при комплиции)
+
+## Как это работает
+
+Проект устроен в три слоя:
+
+```text
+C++ algorithm
+    |
+    | pybind11
+    v
+Python / FastAPI API
+    |
+    | fetch()
+    v
+Browser visualization
+```
+
+C++ возвращает не только итоговый ответ, но и историю шагов. Сервер нормализует эти шаги в JSON. Фронтенд берет JSON и отрисовывает визуализацию как небольшой интерактивный фильм.
+
+## Структура
+
+```text
+algoslib/
+  server/
+    app.py                 FastAPI app
+    routers/               API endpoints
+    static/
+      index.html           основная страница
+      css/style.css        стили
+      js/app.js            логика UI и плеера
+      js/sorting-viz.js    визуализация сортировок
+      js/searche-viz.js    визуализация поиска
+      js/graph-viz.js      визуализация графов
+      js/substring-viz.js  визуализация поиска подстрок
+
+  sorting/                 pybind11-модуль сортировок
+  searches/                pybind11-модуль поиска
+  graphs/                  pybind11-модуль графов
+  substrings/              pybind11-модуль подстрок
+
+lib/
+  sorting/                 C++ сортировки
+  searches/                C++ поиск
+  graphs/                  C++ графовые алгоритмы
+  substrings/              C++ поиск подстрок
+
+tests/                     pytest-тесты
+setup.py                   сборка C++ extensions
+```
+
+## Как добавить новый алгоритм
+
+### 1. Написать C++ реализацию
+
+Добавь `.hpp` в:
+
+```text
+lib/<категория>/include/
+```
+
+Если нужен отдельный исходник, добавь `.cpp` в:
+
+```text
+lib/<категория>/src/
+```
+
+Алгоритм для визуализации должен возвращать историю шагов. Один шаг равен одному понятному действию: сравнение, сдвиг, посещение вершины, запись результата и так далее.
+
+### 2. Подключить к pybind11
+
+Добавь функцию в соответствующий файл:
+
+```text
+algoslib/<категория>/sub_<категория>.cpp
+```
+
+Например:
+
+```text
+algoslib/substrings/sub_substrings.cpp
+```
+
+### 3. Добавить файл в сборку
+
+Если появился новый `.cpp`, пропиши его в `setup.py` в нужном extension.
+
+После этого пересобери:
+
+```bash
+python setup.py build_ext --inplace
+```
+
+### 4. Добавить API endpoint
+
+Роутеры лежат здесь:
+
+```text
+algoslib/server/routers/
+```
+
+Endpoint должен вернуть данные в формате, который понимает фронтенд: массив шагов, исходные данные и результат, если он нужен.
+
+### 5. Добавить алгоритм в интерфейс
+
+Обычно нужно:
+
+- добавить `<option>` в `algoslib/server/static/index.html`;
+- добавить мета-информацию в `SUBSTRING_META`, `SORTING_META`, `SEARCH_META` или аналогичный объект в `app.js`;
+- при необходимости расширить визуализацию в `static/js/*-viz.js`.
+
+## Если сборка странно себя ведет
+
+Иногда помогает очистить старые артефакты:
+
 ```bash
 rm -rf build/ dist/ *.egg-info
 find . -name "*.so" -delete
@@ -131,8 +199,23 @@ find . -name "*.o" -delete
 
 python setup.py build_ext --inplace
 pytest tests/
-
-python -m algoslib.server
 ```
 
+## Идея проекта
 
+`algoslib` не пытается быть просто набором функций. Его смысл в том, чтобы алгоритмы перестали быть черным ящиком.
+
+Ты вводишь данные, нажимаешь старт и видишь весь процесс по шагам. Для учебы это сильно приятнее, чем смотреть на сухой псевдокод и делать вид, что все очевидно.
+
+## Стек
+
+- C++17
+- Python
+- pybind11
+- FastAPI
+- HTML/CSS/JavaScript
+- pytest
+
+## Статус
+
+Проект активно расширяется. Новые алгоритмы добавляются постепенно, а визуализации улучшаются по мере того, как находятся неудобные места в интерфейсе.
