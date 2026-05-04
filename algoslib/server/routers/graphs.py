@@ -70,6 +70,10 @@ class BiDijkstraRequest(BaseModel):
 class TopoSortRequest(BaseModel):
     edges: list[list[str]]
 
+class DSURequest(BaseModel):
+    edges: list[list[str]]  
+
+
 def _normalize_label(value: str) -> str:
     label = str(value).strip()
     if not label:
@@ -927,6 +931,44 @@ async def run_topo_sort(req: TopoSortRequest):
         return {
             "steps": result_steps, "edges": parsed_edges, "nodes": sorted(nodes),
             "node_labels": node_labels, "algorithm": "topological_sort"
+        }
+    except HTTPException: raise
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+@router.post("/connected_components")
+async def run_dsu(req: DSURequest):
+    try:
+        from algoslib.graphs import Graph, connected_components
+        if connected_components is None:
+            raise HTTPException(status_code=501, detail="DSU недоступен.")
+
+        label_to_id, node_labels = _build_label_maps_no_start(req.edges)
+        parsed_edges = _parse_unweighted_edges(req.edges, label_to_id)
+
+        graph = Graph()
+        nodes = set()
+        for u, v in parsed_edges:
+            graph.add_edge(u, v)
+            nodes.add(u); nodes.add(v)
+
+        steps = connected_components(graph)
+        result_steps = []
+        for step in steps:
+            result_steps.append({
+                "edge_from": int(step.edge_from) if step.edge_from != -1 else None,
+                "edge_to": int(step.edge_to) if step.edge_to != -1 else None,
+                "action": step.action,
+                "accepted": bool(step.accepted),
+                "parent": {str(k): int(v) for k, v in step.parent.items()},
+                "component_root": {str(k): int(v) for k, v in step.component_root.items()},
+                "components_count": int(step.components_count),
+            })
+
+        return {
+            "steps": result_steps, "edges": parsed_edges, "nodes": sorted(nodes),
+            "node_labels": node_labels, "algorithm": "connected_components"
         }
     except HTTPException: raise
     except Exception as e:

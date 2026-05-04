@@ -1163,3 +1163,46 @@ export function updateTopoSortStep(svg, nodes, edges, step, nodeLabels = {}) {
     
     return lines.join('<br>');
 }
+
+export function updateDSUStep(svg, nodes, edges, step, nodeLabels = {}) {
+    const activeEdge = (step.edge_from !== null && step.edge_to !== null) ? [step.edge_from, step.edge_to] : null;
+    
+    // Раскраска по компонентам
+    const roots = new Set(Object.values(step.component_root || {}));
+    const rootColors = {};
+    const palette = ['#f44747', '#4ec9b0', '#ce9178', '#89b4fa', '#cba6f7', '#f9e2af', '#a6e3a1'];
+    let idx = 0;
+    roots.forEach(r => { rootColors[r] = palette[idx++ % palette.length]; });
+
+    const nodeColors = {};
+    for (const n of nodes) {
+        const root = step.component_root?.[n];
+        nodeColors[n] = root !== undefined ? rootColors[root] : '#3e3e42';
+    }
+
+    const relaxedEdge = step.accepted && activeEdge ? activeEdge : null;
+    draw(svg, nodes, edges, false, nodeColors, {}, activeEdge, relaxedEdge, nodeLabels, null);
+
+    const lines = [];
+    const actLabels = {
+        'init': 'Инициализация: каждая вершина в своём множестве',
+        'explore': 'Проверка ребра',
+        'union': 'Объединение множеств!',
+        'skip': 'Вершины уже связаны',
+        'done': 'Поиск завершён'
+    };
+    lines.push(`<span class="label">Действие:</span> <span class="value">${actLabels[step.action] || step.action}</span>`);
+    if (activeEdge) lines.push(`<span class="label">Ребро:</span> <span class="value">${getNodeLabel(step.edge_from, nodeLabels)} — ${getNodeLabel(step.edge_to, nodeLabels)}</span>`);
+    lines.push(`<span class="label">Компонент:</span> <span class="value">${step.components_count}</span>`);
+
+    if (step.action === 'done' || step.action === 'init') {
+        const groups = {};
+        for (const [n, r] of Object.entries(step.component_root)) {
+            if (!groups[r]) groups[r] = [];
+            groups[r].push(getNodeLabel(n, nodeLabels));
+        }
+        const comps = Object.values(groups).map(m => `{${m.join(', ')}}`).join(', ');
+        lines.push(`<span class="label">Компоненты:</span> <span class="value">${comps}</span>`);
+    }
+    return lines.join('<br>');
+}

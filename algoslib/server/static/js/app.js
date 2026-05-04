@@ -1,5 +1,5 @@
 import { renderSortingCells, updateSortingStep } from './sorting-viz.js';
-import { renderGraph, updateGraphStep, setSpacing, setViewScale, renderFlowGraph, updateFlowGraphStep, updateTarjanStep, updateKosarajuStep, updateAStarStep, updateBiDijkstraStep, updateTopoSortStep } from './graph-viz.js';
+import { renderGraph, updateGraphStep, setSpacing, setViewScale, renderFlowGraph, updateFlowGraphStep, updateTarjanStep, updateKosarajuStep, updateAStarStep, updateBiDijkstraStep, updateTopoSortStep, updateDSUStep } from './graph-viz.js';
 import { renderSearchCells, updateSearchStep } from './searche-viz.js';
 import { renderSubstringViz, updateSubstringStep } from './substring-viz.js';
 
@@ -1492,6 +1492,14 @@ document.getElementById('graph-algo').addEventListener('change', (e) => {
         startInput.disabled = true;
         startInput.placeholder = 'Не требуется';
         startInput.value = '';
+    } else if (algo === 'connected_components') {
+        label.textContent = 'Рёбра неориентированного графа (A B):';
+        if (sourceLabel) sourceLabel.textContent = 'Не требуется:';
+        if (sinkField) sinkField.style.display = 'none';
+        if (goalField) goalField.style.display = 'none';
+        startInput.disabled = true;
+        startInput.placeholder = 'Не требуется';
+        startInput.value = '';
     } else {
         label.textContent = 'Рёбра (по одному на строке: A B):';
         if (sourceLabel) sourceLabel.textContent = 'Начальная вершина:';
@@ -1535,6 +1543,9 @@ document.getElementById('graph-example').addEventListener('click', () => {
     } else if (algo === 'topological_sort') {
         document.getElementById('graph-edges').value = 'A B\nA C\nB D\nC D\nD E';
         document.getElementById('graph-start').value = '';
+    } else if (algo === 'connected_components') {
+        document.getElementById('graph-edges').value = 'A B\nB C\nD E\nE F\nF D';
+        document.getElementById('graph-start').value = '';
     } else {
         document.getElementById('graph-edges').value = 'A B\nA C\nB D\nC D\nD E\nE F\nC F';
         document.getElementById('graph-start').value = 'A';
@@ -1568,7 +1579,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
         return;
     }
 
-    if (!startNode && algo !== 'kruskal' && algo !== 'ford_fulkerson' && algo !== 'tarjan' && algo !== 'kosaraju' && algo !== 'stalin_sort' && algo !== 'hierholzer' && algo !== 'topological_sort') {
+    if (!startNode && algo !== 'kruskal' && algo !== 'ford_fulkerson' && algo !== 'tarjan' && algo !== 'kosaraju' && algo !== 'stalin_sort' && algo !== 'hierholzer' && algo !== 'topological_sort' && algo !== 'connected_components') {
         graphPlayer.el.status.textContent = 'Введите стартовую ноду';
         return;
     }
@@ -1623,7 +1634,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
 
         const reqBody = (algo === 'astar' || algo === 'bidijkstra')
             ? { edges, start_node: startNode, goal_node: goalNode, node_coords: [] }
-            : (algo === 'kruskal' || algo === 'tarjan' || algo === 'kosaraju' || algo === 'stalin_sort' || algo === 'hierholzer' || algo === 'topological_sort')
+            : (algo === 'kruskal' || algo === 'tarjan' || algo === 'kosaraju' || algo === 'stalin_sort' || algo === 'hierholzer' || algo === 'topological_sort' || algo === 'connected_components')
                 ? { edges }
                 : algo === 'ford_fulkerson' || algo === 'edmonds_karp'
                     ? { edges, start_node: startNode, sink: sinkNode }
@@ -1681,6 +1692,10 @@ document.getElementById('graph-run').addEventListener('click', async () => {
             graphPlayer.renderFn = renderTopoSortStepAt;
             renderGraph(graphSvg, graphData.nodes, graphData.edges, false, graphData.nodeLabels);
             renderTopoSortStepAt(0);
+        } else if (algo === 'connected_components') {
+            graphPlayer.renderFn = renderDSUStepAt;
+            renderGraph(graphSvg, graphData.nodes, graphData.edges, false, graphData.nodeLabels);
+            renderDSUStepAt(0);
         } else {
             graphPlayer.renderFn = renderGraphStepAt;
             const weighted = algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal';
@@ -1772,6 +1787,11 @@ function renderTopoSortStepAt(idx) {
     graphPlayer.el.status.textContent = step.has_cycle 
         ? `Цикл обнаружен! Шаг ${idx + 1}` 
         : `Шаг ${idx + 1} / ${graphPlayer.steps.length}`;
+}
+function renderDSUStepAt(idx) {
+    const step = graphPlayer.steps[idx];
+    graphInfo.innerHTML = updateDSUStep(graphSvg, graphData.nodes, graphData.edges, step, graphData.nodeLabels);
+    graphPlayer.el.status.textContent = `Компонент: ${step.components_count} | Шаг ${idx+1}`;
 }
 
 function refreshIcons() {
