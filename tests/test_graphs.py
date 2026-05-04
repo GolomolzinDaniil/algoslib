@@ -1210,3 +1210,102 @@ def test_topo_history_steps():
             found_select = True
             break
     assert found_select
+
+
+def test_dsu_simple_path():
+    """Линейный граф: 0 -- 1 -- 2. Все вершины должны попасть в одну компоненту."""
+    g = Graph()
+    g.add_edge(0, 1)
+    g.add_edge(1, 2)
+
+    steps = connected_components(g)
+    final_step = steps[-1]
+
+    assert final_step.action == "done"
+    assert final_step.components_count == 1
+    # Все вершины должны указывать на один корень
+    roots = set(final_step.component_root.values())
+    assert len(roots) == 1
+
+
+def test_dsu_step_type():
+    """Проверка типа возвращаемых шагов."""
+    g = Graph()
+    g.add_edge(0, 1)
+    steps = connected_components(g)
+    assert all(isinstance(s, DSU_Step) for s in steps)
+
+
+def test_dsu_disconnected_components():
+    """Граф с двумя отдельными компонентами: 0-1 и 2-3."""
+    g = Graph()
+    g.add_edge(0, 1)
+    g.add_edge(2, 3)
+
+    steps = connected_components(g)
+    final_step = steps[-1]
+
+    assert final_step.components_count == 2
+    roots = set(final_step.component_root.values())
+    assert len(roots) == 2
+
+
+def test_dsu_cycle_skip():
+    """Граф с циклом (треугольник). Третье ребро должно быть пропущено (action='skip')."""
+    g = Graph()
+    g.add_edge(0, 1)
+    g.add_edge(1, 2)
+    g.add_edge(0, 2)
+
+    steps = connected_components(g)
+    skip_steps = [s for s in steps if s.action == "skip"]
+    
+    assert len(skip_steps) >= 1
+    final_step = steps[-1]
+    assert final_step.components_count == 1
+
+
+def test_dsu_empty_graph():
+    """Пустой граф не должен вызывать ошибок."""
+    g = Graph()
+    steps = connected_components(g)
+    assert len(steps) == 0
+
+
+def test_dsu_component_count_decreases():
+    """Проверка, что счетчик компонент корректно уменьшается при объединениях."""
+    g = Graph()
+    g.add_edge(0, 1)  # 4 узла -> 3 компоненты
+    g.add_edge(2, 3)  # -> 2 компоненты
+    g.add_edge(1, 2)  # -> 1 компонента (соединяет два кластера)
+
+    steps = connected_components(g)
+    union_steps = [s for s in steps if s.action == "union"]
+    
+    assert len(union_steps) == 3
+    # Проверяем значения счетчика после каждого успешного объединения
+    assert union_steps[0].components_count == 3
+    assert union_steps[1].components_count == 2
+    assert union_steps[2].components_count == 1
+
+
+def test_dsu_history_structure():
+    """Проверка структуры шагов: init -> explore -> union -> done."""
+    g = Graph()
+    g.add_edge(0, 1)
+    steps = connected_components(g)
+
+    assert steps[0].action == "init"
+    assert steps[0].components_count == 2  # Две вершины, два множества
+
+    # Ищем шаг исследования ребра
+    explore_step = next(s for s in steps if s.action == "explore")
+    assert explore_step.edge_from == 0
+    assert explore_step.edge_to == 1
+
+    # Ищем шаг объединения
+    union_step = next(s for s in steps if s.action == "union")
+    assert union_step.accepted is True
+    assert union_step.components_count == 1
+
+    assert steps[-1].action == "done"
