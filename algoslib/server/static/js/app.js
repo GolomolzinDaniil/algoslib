@@ -1,5 +1,5 @@
 import { renderSortingCells, updateSortingStep } from './sorting-viz.js';
-import { renderGraph, updateGraphStep, setSpacing, setViewScale, renderFlowGraph, updateFlowGraphStep, updateTarjanStep, updateKosarajuStep, updateAStarStep, updateBiDijkstraStep } from './graph-viz.js';
+import { renderGraph, updateGraphStep, setSpacing, setViewScale, renderFlowGraph, updateFlowGraphStep, updateTarjanStep, updateKosarajuStep, updateAStarStep, updateBiDijkstraStep, updateTopoSortStep } from './graph-viz.js';
 import { renderSearchCells, updateSearchStep } from './searche-viz.js';
 import { renderSubstringViz, updateSubstringStep } from './substring-viz.js';
 
@@ -1437,7 +1437,6 @@ function applyAutoSpacing(nodes, edges) {
 document.getElementById('graph-algo').addEventListener('change', (e) => {
     const algo = e.target.value;
     
-    // 🔹 Объявляем ВСЕ переменные СРАЗУ в начале
     const label = document.getElementById('edges-label');
     const sourceLabel = document.getElementById('source-label');
     const sinkField = document.getElementById('sink-field');
@@ -1445,16 +1444,13 @@ document.getElementById('graph-algo').addEventListener('change', (e) => {
     const cycleField = document.getElementById('hamiltonian-cycle-field');
     const startInput = document.getElementById('graph-start');
     
-    // 🔹 Сбрасываем видимость всех дополнительных полей
     if (sinkField) sinkField.style.display = 'none';
     if (goalField) goalField.style.display = 'none';
     if (cycleField) cycleField.style.display = 'none';
-    
-    // 🔹 По умолчанию старт активен
+
     startInput.disabled = false;
     startInput.placeholder = 'A';
     
-    // 🔹 Логика переключения
     if (algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal') {
         label.textContent = 'Рёбра (по одному на строке: A B вес):';
         if (sourceLabel) sourceLabel.textContent = 'Стартовая вершина:';
@@ -1474,7 +1470,7 @@ document.getElementById('graph-algo').addEventListener('change', (e) => {
     else if (algo === 'astar' || algo === 'bidijkstra') {
         label.textContent = 'Рёбра (по одному на строке: A B вес):';
         if (sourceLabel) sourceLabel.textContent = 'Старт:';
-        if (goalField) goalField.style.display = 'flex';  // ← Показываем цель!
+        if (goalField) goalField.style.display = 'flex'; 
     } 
     else if (algo === 'hierholzer') {
         label.textContent = 'Рёбра ориентированного графа (A B):';
@@ -1487,9 +1483,16 @@ document.getElementById('graph-algo').addEventListener('change', (e) => {
         label.textContent = 'Рёбра (по одному на строке: A B):';
         if (sourceLabel) sourceLabel.textContent = 'Начальная вершина:';
         if (cycleField) cycleField.style.display = 'flex';
-    } 
-    else {
-        // BFS, Stalin Sort и другие
+    }
+    else if (algo === 'topological_sort') {
+        label.textContent = 'Рёбра ориентированного графа (A B):';
+        if (sourceLabel) sourceLabel.textContent = 'Не требуется:';
+        if (sinkField) sinkField.style.display = 'none';
+        if (goalField) goalField.style.display = 'none';
+        startInput.disabled = true;
+        startInput.placeholder = 'Не требуется';
+        startInput.value = '';
+    } else {
         label.textContent = 'Рёбра (по одному на строке: A B):';
         if (sourceLabel) sourceLabel.textContent = 'Начальная вершина:';
     }
@@ -1529,6 +1532,9 @@ document.getElementById('graph-example').addEventListener('click', () => {
         document.getElementById('graph-edges').value = 'A B 1\nA C 4\nB D 2\nC D 1\nC E 3\nD F 2\nE F 1';
         document.getElementById('graph-start').value = 'A';
         document.getElementById('graph-goal').value = 'F';
+    } else if (algo === 'topological_sort') {
+        document.getElementById('graph-edges').value = 'A B\nA C\nB D\nC D\nD E';
+        document.getElementById('graph-start').value = '';
     } else {
         document.getElementById('graph-edges').value = 'A B\nA C\nB D\nC D\nD E\nE F\nC F';
         document.getElementById('graph-start').value = 'A';
@@ -1562,7 +1568,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
         return;
     }
 
-    if (!startNode && algo !== 'kruskal' && algo !== 'ford_fulkerson' && algo !== 'tarjan' && algo !== 'kosaraju' && algo !== 'stalin_sort' && algo !== 'hierholzer') {
+    if (!startNode && algo !== 'kruskal' && algo !== 'ford_fulkerson' && algo !== 'tarjan' && algo !== 'kosaraju' && algo !== 'stalin_sort' && algo !== 'hierholzer' && algo !== 'topological_sort') {
         graphPlayer.el.status.textContent = 'Введите стартовую ноду';
         return;
     }
@@ -1617,7 +1623,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
 
         const reqBody = (algo === 'astar' || algo === 'bidijkstra')
             ? { edges, start_node: startNode, goal_node: goalNode, node_coords: [] }
-            : (algo === 'kruskal' || algo === 'tarjan' || algo === 'kosaraju' || algo === 'stalin_sort' || algo === 'hierholzer')
+            : (algo === 'kruskal' || algo === 'tarjan' || algo === 'kosaraju' || algo === 'stalin_sort' || algo === 'hierholzer' || algo === 'topological_sort')
                 ? { edges }
                 : algo === 'ford_fulkerson' || algo === 'edmonds_karp'
                     ? { edges, start_node: startNode, sink: sinkNode }
@@ -1671,6 +1677,10 @@ document.getElementById('graph-run').addEventListener('click', async () => {
             graphPlayer.renderFn = renderBiDijkstraStepAt;
             renderGraph(graphSvg, graphData.nodes, graphData.edges, true, graphData.nodeLabels);
             renderBiDijkstraStepAt(0);
+        } else if (algo === 'topological_sort') {
+            graphPlayer.renderFn = renderTopoSortStepAt;
+            renderGraph(graphSvg, graphData.nodes, graphData.edges, false, graphData.nodeLabels);
+            renderTopoSortStepAt(0);
         } else {
             graphPlayer.renderFn = renderGraphStepAt;
             const weighted = algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal';
@@ -1754,6 +1764,14 @@ function renderKosarajuStepAt(idx) {
     );
     graphInfo.innerHTML = info;
     graphPlayer.el.status.textContent = `Фаза ${step.phase}, шаг ${idx + 1} / ${graphPlayer.steps.length}`;
+}
+function renderTopoSortStepAt(idx) {
+    const step = graphPlayer.steps[idx];
+    const info = updateTopoSortStep(graphSvg, graphData.nodes, graphData.edges, step, graphData.nodeLabels);
+    graphInfo.innerHTML = info;
+    graphPlayer.el.status.textContent = step.has_cycle 
+        ? `Цикл обнаружен! Шаг ${idx + 1}` 
+        : `Шаг ${idx + 1} / ${graphPlayer.steps.length}`;
 }
 
 function refreshIcons() {
