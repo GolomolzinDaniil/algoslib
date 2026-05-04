@@ -1115,3 +1115,51 @@ export function updateBiDijkstraStep(svg, nodes, edges, step, nodeLabels = {}) {
     lines.push(`<span class="label">Фронты:</span> <span class="value">F: ${fOpen.size} | B: ${bOpen.size}</span>`);
     return lines.join('<br>');
 }
+
+export function updateTopoSortStep(svg, nodes, edges, step, nodeLabels = {}) {
+    const inZero = new Set(step.zero_indegree_queue || []);
+    const inResult = new Set(step.result_order || []);
+    const current = step.processed_node;
+    
+    let activeEdge = null;
+    if (step.edge_from !== null && step.edge_to !== null) activeEdge = [step.edge_from, step.edge_to];
+
+    const nodeColors = {};
+    for (const n of nodes) {
+        if (step.has_cycle && !inResult.has(n)) nodeColors[n] = '#f38ba8'; // Цикл
+        else if (n === current) nodeColors[n] = COLORS.current;
+        else if (inZero.has(n)) nodeColors[n] = COLORS.queue;
+        else if (inResult.has(n)) nodeColors[n] = COLORS.visited;
+        else nodeColors[n] = '#3e3e42';
+    }
+
+    // Передаём in_degree как distances (draw покажет "d=...")
+    draw(svg, nodes, edges, false, nodeColors, step.in_degree || {}, activeEdge, null, nodeLabels, null);
+
+    const lines = [];
+    const actLabels = {
+        'init': 'Инициализация степеней захода',
+        'select': 'Выбор вершины с in-degree=0',
+        'explore': 'Исследование исходящего ребра',
+        'update': 'Уменьшение in-degree',
+        'enqueue': 'Добавление в очередь кандидатов',
+        'cycle': 'Обнаружен цикл! Сортировка невозможна.',
+        'done': 'Топологический порядок построен'
+    };
+    lines.push(`<span class="label">Действие:</span> <span class="value">${actLabels[step.action] || step.action}</span>`);
+    
+    if (current !== null) lines.push(`<span class="label">Вершина:</span> <span class="value">${getNodeLabel(current, nodeLabels)}</span>`);
+    if (activeEdge) lines.push(`<span class="label">Ребро:</span> <span class="value">${getNodeLabel(step.edge_from, nodeLabels)} → ${getNodeLabel(step.edge_to, nodeLabels)}</span>`);
+    
+    if (step.zero_indegree_queue.length > 0) {
+        const qLabels = step.zero_indegree_queue.map(n => getNodeLabel(n, nodeLabels)).join(', ');
+        lines.push(`<span class="label">Очередь (in=0):</span> <span class="value">[${qLabels}]</span>`);
+    }
+    
+    if (step.result_order.length > 0) {
+        const resLabels = step.result_order.map(n => getNodeLabel(n, nodeLabels)).join(' → ');
+        lines.push(`<span class="label">Порядок:</span> <span class="value">${resLabels}</span>`);
+    }
+    
+    return lines.join('<br>');
+}

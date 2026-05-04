@@ -1083,3 +1083,130 @@ def test_astar_vs_dijkstra_consistency():
             assert dijkstra_final[node] == float('inf')
         else:
             assert abs(astar_final[node] - dijkstra_final[node]) < 1e-9
+
+def test_topo_linear_dag():
+    """Простой линейный граф: 0 -> 1 -> 2"""
+    g = OrientedGraph()
+    g.add_edge(0, 1)
+    g.add_edge(1, 2)
+
+    steps = topological_sort(g)
+
+    assert len(steps) > 0
+    final_step = steps[-1]
+    assert final_step.has_cycle is False
+    assert set(final_step.result_order) == {0, 1, 2}
+
+    # Проверка порядка: 0 должен быть раньше 1, 1 раньше 2
+    res_list = final_step.result_order
+    assert res_list.index(0) < res_list.index(1)
+    assert res_list.index(1) < res_list.index(2)
+
+
+def test_topo_step_type():
+    """Проверка типа возвращаемых шагов."""
+    g = OrientedGraph()
+    g.add_edge(0, 1)
+    steps = topological_sort(g)
+    assert all(isinstance(s, TopoStep) for s in steps)
+
+
+def test_topo_diamond_graph():
+    """
+    Граф-ромб:
+    0 -> 1
+    0 -> 2
+    1 -> 3
+    2 -> 3
+    """
+    g = OrientedGraph()
+    g.add_edge(0, 1)
+    g.add_edge(0, 2)
+    g.add_edge(1, 3)
+    g.add_edge(2, 3)
+
+    steps = topological_sort(g)
+    final_step = steps[-1]
+
+    assert final_step.has_cycle is False
+    assert set(final_step.result_order) == {0, 1, 2, 3}
+    res_list = final_step.result_order
+
+    # 0 должен быть первым
+    assert res_list[0] == 0
+    # 3 должен быть последним
+    assert res_list[-1] == 3
+    # 1 и 2 должны быть между 0 и 3 (порядок между ними может быть любым)
+    assert res_list.index(1) > res_list.index(0)
+    assert res_list.index(2) > res_list.index(0)
+    assert res_list.index(3) > res_list.index(1)
+    assert res_list.index(3) > res_list.index(2)
+
+
+def test_topo_cycle_detection():
+    """Граф с циклом: 0 -> 1 -> 2 -> 0. Топологическая сортировка невозможна."""
+    g = OrientedGraph()
+    g.add_edge(0, 1)
+    g.add_edge(1, 2)
+    g.add_edge(2, 0)
+
+    steps = topological_sort(g)
+    final_step = steps[-1]
+
+    assert final_step.has_cycle is True
+    # Результат не должен содержать все вершины (цикл не будет обработан)
+    assert len(final_step.result_order) < 3
+
+
+def test_topo_disjoint_components():
+    """Две несвязные компоненты: 0->1 и 2->3"""
+    g = OrientedGraph()
+    g.add_edge(0, 1)
+    g.add_edge(2, 3)
+
+    steps = topological_sort(g)
+    final_step = steps[-1]
+
+    assert final_step.has_cycle is False
+    assert set(final_step.result_order) == {0, 1, 2, 3}
+    res_list = final_step.result_order
+
+    # Проверяем порядок внутри компонент
+    assert res_list.index(0) < res_list.index(1)
+    assert res_list.index(2) < res_list.index(3)
+
+
+def test_topo_empty_graph():
+    """Пустой граф"""
+    g = OrientedGraph()
+    steps = topological_sort(g)
+    assert len(steps) == 0
+
+
+def test_topo_single_edge():
+    """Граф с одним ребром"""
+    g = OrientedGraph()
+    g.add_edge(5, 10)
+    steps = topological_sort(g)
+    final_step = steps[-1]
+    assert final_step.result_order == [5, 10]
+
+
+def test_topo_history_steps():
+    """Проверка структуры шагов истории"""
+    g = OrientedGraph()
+    g.add_edge(0, 1)
+    g.add_edge(1, 2)
+    steps = topological_sort(g)
+
+    # Первый шаг - инициализация
+    assert steps[0].action == 'init'
+    assert steps[0].zero_indegree_queue == [0] # У вершины 0 степень захода 0
+
+    # Ищем шаг выбора вершины
+    found_select = False
+    for step in steps:
+        if step.action == 'select' and step.processed_node == 0:
+            found_select = True
+            break
+    assert found_select

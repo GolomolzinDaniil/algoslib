@@ -48,6 +48,7 @@ extensions = [
             'lib/graphs/src/hamiltonian.cpp',
             'lib/graphs/src/astar.cpp',
             'lib/graphs/src/bidijkstra.cpp',
+            'lib/graphs/src/topo_sort.cpp',
         ],
         include_dirs=[
             pybind11.get_include(),
