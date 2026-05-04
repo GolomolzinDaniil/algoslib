@@ -15,6 +15,7 @@
 #include "kosaraju.hpp"
 #include "astar.hpp"
 #include "bidijkstra.hpp"
+#include "topo_sort.hpp"
 
 namespace py = pybind11;
 
@@ -363,4 +364,17 @@ PYBIND11_MODULE(sub_graphs, m) {
     m.def("bidijkstra", &bidijkstra,
           py::arg("graph"), py::arg("source"), py::arg("target"),
           "Би-дейкстра: поиск кратчайшего пути двумя фронтами. Возвращает List[BiDijkstra_Step].");
+    
+    py::class_<TopoStep>(m, "TopoStep")
+        .def_readonly("result_order", &TopoStep::result_order)
+        .def_readonly("zero_indegree_queue", &TopoStep::zero_indegree_queue)
+        .def_readonly("in_degree", &TopoStep::in_degree)
+        .def_readonly("processed_node", &TopoStep::processed_node)
+        .def_readonly("edge_from", &TopoStep::edge_from)
+        .def_readonly("edge_to", &TopoStep::edge_to)
+        .def_readonly("action", &TopoStep::action)
+        .def_readonly("has_cycle", &TopoStep::has_cycle);
+
+    m.def("topological_sort", &topological_sort, py::arg("graph"),
+          "Топологическая сортировка (алгоритм Кана). Возвращает List[TopoStep].");
 }

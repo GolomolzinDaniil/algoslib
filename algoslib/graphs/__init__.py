@@ -71,6 +71,12 @@ except ImportError:
     BiDijkstra_Step = None
     bidijkstra = None
 
+try:
+    from .sub_graphs import TopoStep, topological_sort
+except ImportError:
+    TopoStep = None
+    topological_sort = None
+
 __all__ = ['bfs', 'Graph', 'BFS_Step', 'Weighted_Graph', 'Dijkstra_Step', 'dijkstra',
            'Ford_Step', 'bellman_ford', 'Kruskal_Step', 'kruskal',
            'Stalin_Step', 'stalin_sort',
@@ -80,5 +86,5 @@ __all__ = ['bfs', 'Graph', 'BFS_Step', 'Weighted_Graph', 'Dijkstra_Step', 'dijks
            'Hamiltonian_Step', 'hamiltonian_backtracking',
            'Tarjan_Step', 'tarjan_scc', 'OrientedGraph', 'Kosaraju_Step', 'kosaraju_scc',
            'Directed_Weighted_Graph', 'AStar_Step', 'astar_pathfinding',
-           'BiDijkstra_Step', 'bidijkstra',
+           'BiDijkstra_Step', 'bidijkstra', "TopoStep", "topological_sort",
           ]
