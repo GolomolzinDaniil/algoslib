@@ -16,6 +16,7 @@
 #include "astar.hpp"
 #include "bidijkstra.hpp"
 #include "topo_sort.hpp"
+#include "dsu.hpp"
 
 namespace py = pybind11;
 
@@ -377,4 +378,16 @@ PYBIND11_MODULE(sub_graphs, m) {
 
     m.def("topological_sort", &topological_sort, py::arg("graph"),
           "Топологическая сортировка (алгоритм Кана). Возвращает List[TopoStep].");
+
+    py::class_<DSU_Step>(m, "DSU_Step")
+        .def_readonly("edge_from", &DSU_Step::edge_from)
+        .def_readonly("edge_to", &DSU_Step::edge_to)
+        .def_readonly("action", &DSU_Step::action)
+        .def_readonly("accepted", &DSU_Step::accepted)
+        .def_readonly("parent", &DSU_Step::parent)
+        .def_readonly("component_root", &DSU_Step::component_root)
+        .def_readonly("components_count", &DSU_Step::components_count);
+
+    m.def("connected_components", &connected_components, py::arg("graph"),
+          "Поиск компонент связности (Union-Find / DSU). Возвращает List[DSU_Step].");
 }
