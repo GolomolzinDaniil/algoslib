@@ -798,11 +798,30 @@ function renderSortStep(idx) {
 }
 
 function parseSearchTarget(raw) {
-    const value = parseFloat(String(raw ?? '').trim());
-    if (Number.isNaN(value)) {
+    const value = parseSearchToken(raw);
+    if (value === null) {
         throw new Error('Введите искомое значение');
     }
     return value;
+}
+
+function parseSearchToken(raw) {
+    const token = String(raw ?? '').trim();
+    if (!token) return null;
+
+    const numericValue = Number(token);
+    if (Number.isFinite(numericValue) && token !== '') {
+        return numericValue;
+    }
+
+    return token;
+}
+
+function parseSearchInput(raw) {
+    return String(raw ?? '')
+        .split(/[\s,;]+/)
+        .map((part) => parseSearchToken(part))
+        .filter((value) => value !== null);
 }
 
 function applySearchPlotCollapsedState() {
@@ -882,7 +901,7 @@ function resetSearchSession() {
 
 function renderSearchInputPreview() {
     if (!searchPlot) return;
-    const data = parseSortInput(searchDataInput?.value || '');
+    const data = parseSearchInput(searchDataInput?.value || '');
     if (data.length === 0) {
         searchPlot.innerHTML = '';
         syncSearchArrayToggle();
@@ -979,7 +998,7 @@ function prependInitialSearchStep(steps, dataLength) {
     ];
 }
 
-function buildSearchSteps(data, resultIndexes, historyIndexes = []) {
+function buildSearchSteps(data, resultIndexes, historyIndexes = [], target = null) {
     const safeData = Array.isArray(data) ? data : [];
     const safeResultIndexes = normalizeSearchResultIndexes(resultIndexes, safeData.length);
     const resultSet = new Set(safeResultIndexes);
@@ -1001,8 +1020,6 @@ function buildSearchSteps(data, resultIndexes, historyIndexes = []) {
                 const mid = Number(item.mid_index);
                 const left = Number(item.left_index);
                 const right = Number(item.right_index);
-                const comparedValue = Number(item.compared_value);
-                const targetValue = Number(item.target_value);
 
                 if (!Number.isInteger(mid) || mid < 0 || mid >= safeData.length) return null;
 
@@ -1017,8 +1034,6 @@ function buildSearchSteps(data, resultIndexes, historyIndexes = []) {
                     mid,
                     left: normalizedLeft,
                     right: normalizedRight,
-                    comparedValue: Number.isFinite(comparedValue) ? comparedValue : safeData[mid],
-                    targetValue: Number.isFinite(targetValue) ? targetValue : null,
                     isMatch: Boolean(item.is_match),
                 };
             })
@@ -1047,8 +1062,8 @@ function buildSearchSteps(data, resultIndexes, historyIndexes = []) {
                 is_match: isMatch,
                 left_index: stepData.left,
                 right_index: stepData.right,
-                compared_value: stepData.comparedValue,
-                target_value: stepData.targetValue,
+                compared_value: safeData[idx],
+                target_value: target,
                 active_indices: [...activeSet],
             });
         }
@@ -1131,7 +1146,7 @@ function applySearchResult(apiResult, data, target) {
     const visualData = Array.isArray(apiResult?.visual_data) ? apiResult.visual_data : data;
     const resultIndexes = Array.isArray(apiResult?.result) ? apiResult.result : [];
     const historyIndexes = Array.isArray(apiResult?.history) ? apiResult.history : [];
-    const builtSteps = buildSearchSteps(visualData, resultIndexes, historyIndexes);
+    const builtSteps = buildSearchSteps(visualData, resultIndexes, historyIndexes, target);
     const steps = prependInitialSearchStep(builtSteps, visualData.length);
 
     searchData = {
@@ -1179,9 +1194,9 @@ function applySearchResult(apiResult, data, target) {
 }
 
 async function loadSearchData() {
-    const data = parseSortInput(searchDataInput?.value || '');
+    const data = parseSearchInput(searchDataInput?.value || '');
     if (data.length === 0) {
-        throw new Error('Введите числа через запятую');
+        throw new Error('Введите значения через запятую');
     }
 
     const algo = searchAlgoSelect?.value;

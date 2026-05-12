@@ -6,7 +6,7 @@
 #include "../../sorting/include/bubble_sort.hpp"
 
 template <typename T>
-using Binary_search_step = std::tuple<std::size_t, std::size_t, std::size_t, T, T, bool>;
+using Binary_search_step = std::tuple<std::size_t, std::size_t, std::size_t, bool>;
 
 template <typename T>
 std::vector<T> binary_search_sorted(const std::vector<T>& arr)
@@ -29,7 +29,7 @@ std::vector<Binary_search_step<T>> binary_search_h(const std::vector<T>& arr, T 
     while (left <= right) {
         const std::size_t mid = left + (right - left) / 2;
         const bool is_match = sorted[mid] == target;
-        history.emplace_back(left, right, mid, sorted[mid], target, is_match);
+        history.emplace_back(left, right, mid, is_match);
 
         if (is_match) {
             break;
