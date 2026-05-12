@@ -1379,7 +1379,7 @@ function rerenderCurrentGraph() {
         renderFlowGraph(graphSvg, graphData.nodes, graphData.edges, graphData.source, graphData.sink, graphData.nodeLabels);
         if (graphPlayer.steps.length) renderFlowStepAt(graphPlayer.current);
     } else {
-        const weighted = algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal';
+        const weighted = algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal' || algo === 'prim';
         renderGraph(graphSvg, graphData.nodes, graphData.edges, weighted, graphData.nodeLabels);
         if (graphPlayer.steps.length) renderGraphStepAt(graphPlayer.current);
     }
@@ -1451,7 +1451,7 @@ document.getElementById('graph-algo').addEventListener('change', (e) => {
     startInput.disabled = false;
     startInput.placeholder = 'A';
     
-    if (algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal') {
+    if (algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal' || algo === 'prim') {
         label.textContent = 'Рёбра (по одному на строке: A B вес):';
         if (sourceLabel) sourceLabel.textContent = 'Стартовая вершина:';
     } 
@@ -1522,6 +1522,9 @@ document.getElementById('graph-example').addEventListener('click', () => {
     } else if (algo === 'kruskal') {
         document.getElementById('graph-edges').value = 'A B 4\nA C 2\nB C 1\nB D 5\nC D 8\nC E 10\nD E 2\nD F 6\nE F 3';
         document.getElementById('graph-start').value = '';
+    } else if (algo === 'prim') {
+        document.getElementById('graph-edges').value = 'A B 4\nA C 2\nB C 1\nB D 5\nC D 8\nC E 10\nD E 2\nD F 6\nE F 3';
+        document.getElementById('graph-start').value = 'A';
     } else if (algo === 'tarjan' || algo === 'kosaraju') { 
     document.getElementById('graph-edges').value = 'A B\nB C\nC A\nC D\nD E\nE D\nF C';
     document.getElementById('graph-start').value = '';
@@ -1554,7 +1557,7 @@ document.getElementById('graph-example').addEventListener('click', () => {
 
 function updateGraphEdgesLabelEnhanced(algo) {
     const label = document.getElementById('edges-label');
-    if (algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal') {
+    if (algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal' || algo === 'prim') {
         label.textContent = 'Рёбра (по одному на строке: A B вес):';
     } else if (algo === 'ford_fulkerson') {
         label.textContent = 'Рёбра (A B пропускная_способность):';
@@ -1611,7 +1614,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
             graphPlayer.el.status.textContent = 'Название ноды должно быть не длиннее 3 символов';
             return;
         }
-        if (algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal' ||
+        if (algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal' || algo === 'prim' ||
             algo === 'ford_fulkerson' || algo === 'edmonds_karp' || algo === 'astar' || 
             algo === 'bidijkstra') {
             if (parts.length >= 3) edges.push([parts[0], parts[1], parts[2]]);
@@ -1698,7 +1701,7 @@ document.getElementById('graph-run').addEventListener('click', async () => {
             renderDSUStepAt(0);
         } else {
             graphPlayer.renderFn = renderGraphStepAt;
-            const weighted = algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal';
+            const weighted = algo === 'dijkstra' || algo === 'bellman_ford' || algo === 'kruskal' || algo === 'prim';
             renderGraph(graphSvg, graphData.nodes, graphData.edges, weighted, graphData.nodeLabels);
             renderGraphStepAt(0);
         }
