@@ -417,6 +417,92 @@ def test_kruskal_components():
     assert len(set(final_components.values())) == 1
 
 
+def test_prim_step_type():
+    """Проверка типа возвращаемых шагов."""
+    g = Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    steps = prim(g, 0)
+    assert all(isinstance(s, Prim_Step) for s in steps)
+
+
+def test_prim_simple():
+    """Простой граф: 0 --1.0-- 1 --2.0-- 2."""
+    g = Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    g.add_edge(1, 2, 2.0)
+
+    steps = prim(g, 0)
+
+    assert len(steps) == 2
+    assert all(step.accepted for step in steps)
+    assert abs(steps[-1].total_weight - 3.0) < 1e-9
+    assert set(steps[-1].visited) == {0, 1, 2}
+
+
+def test_prim_prefers_light_edges():
+    """
+    Граф с выбором ребра:
+    0 --4-- 1
+    0 --2-- 2
+    1 --1-- 2
+    1 --5-- 3
+    2 --8-- 3
+    MST: (0,2,2), (2,1,1), (1,3,5) => вес 8
+    """
+    g = Weighted_Graph()
+    g.add_edge(0, 1, 4.0)
+    g.add_edge(0, 2, 2.0)
+    g.add_edge(1, 2, 1.0)
+    g.add_edge(1, 3, 5.0)
+    g.add_edge(2, 3, 8.0)
+
+    steps = prim(g, 0)
+
+    accepted = [s for s in steps if s.accepted]
+    assert len(accepted) == 3
+    assert abs(steps[-1].total_weight - 8.0) < 1e-9
+
+
+def test_prim_skips_cycle_edge():
+    """Prim должен отклонять ребро, ведущее в уже посещённую вершину."""
+    g = Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    g.add_edge(1, 2, 2.0)
+    g.add_edge(0, 2, 3.0)
+
+    steps = prim(g, 0)
+
+    assert any(not step.accepted for step in steps)
+    assert abs(steps[-1].total_weight - 3.0) < 1e-9
+
+
+def test_prim_disconnected_component_from_start():
+    """Prim строит остов только в компоненте достижимости стартовой вершины."""
+    g = Weighted_Graph()
+    g.add_edge(0, 1, 1.0)
+    g.add_edge(2, 3, 2.0)
+
+    steps = prim(g, 0)
+
+    assert abs(steps[-1].total_weight - 1.0) < 1e-9
+    assert set(steps[-1].visited) == {0, 1}
+
+
+def test_prim_vs_kruskal_on_connected_graph():
+    """На связном графе Prim и Kruskal должны давать одинаковый вес MST."""
+    g = Weighted_Graph()
+    g.add_edge(0, 1, 4.0)
+    g.add_edge(0, 2, 2.0)
+    g.add_edge(1, 2, 1.0)
+    g.add_edge(1, 3, 5.0)
+    g.add_edge(2, 3, 8.0)
+
+    prim_steps = prim(g, 0)
+    kruskal_steps = kruskal(g)
+
+    assert abs(prim_steps[-1].total_weight - kruskal_steps[-1].total_weight) < 1e-9
+
+
 def test_ford_fulkerson_simple():
     """Простой граф: s -> a -> t с пропускной способностью 10"""
     g = Flow_Graph()

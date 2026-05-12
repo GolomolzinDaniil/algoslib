@@ -39,6 +39,7 @@ extensions = [
             'lib/graphs/src/dijkstra.cpp',
             'lib/graphs/src/bellman_ford.cpp',
             'lib/graphs/src/kruskal.cpp',
+            'lib/graphs/src/prim.cpp',
             'lib/graphs/src/stalin_sort.cpp',
             'lib/graphs/src/ford_fulkerson.cpp',
             'lib/graphs/src/edmonds_karp.cpp',
