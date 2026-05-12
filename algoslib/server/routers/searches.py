@@ -18,6 +18,9 @@ linear_searche_both_sides_h_cpp = getattr(sub_searches_cpp, "linear_searche_both
 binary_search_cpp = getattr(sub_searches_cpp, "binary_search", None) if sub_searches_cpp else None
 binary_search_h_cpp = getattr(sub_searches_cpp, "binary_search_h", None) if sub_searches_cpp else None
 binary_search_sorted_cpp = getattr(sub_searches_cpp, "binary_search_sorted", None) if sub_searches_cpp else None
+fibonacci_search_cpp = getattr(sub_searches_cpp, "fibonacci_search", None) if sub_searches_cpp else None
+fibonacci_search_h_cpp = getattr(sub_searches_cpp, "fibonacci_search_h", None) if sub_searches_cpp else None
+fibonacci_search_sorted_cpp = getattr(sub_searches_cpp, "fibonacci_search_sorted", None) if sub_searches_cpp else None
 
 router = APIRouter()
 
@@ -105,6 +108,7 @@ async def run_linear_searche(req: SearchRequest):
             "result": result,
             "history": history,
             "visual_data": search_data,
+            "visual_target": search_target,
             "source": "cpp",
             "history_source": "cpp",
         }
@@ -132,6 +136,7 @@ async def run_linear_searche_both_sides(req: SearchRequest):
             "result": result,
             "history": history,
             "visual_data": search_data,
+            "visual_target": search_target,
             "source": "cpp",
             "history_source": "cpp",
         }
@@ -178,8 +183,50 @@ async def run_binary_search(req: SearchRequest):
             "result": result,
             "history": history,
             "visual_data": visual_data,
+            "visual_target": search_target,
             "source": "cpp",
             "history_source": "cpp",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
+@router.post("/fibonacci_search")
+async def run_fibonacci_search(req: SearchRequest):
+    try:
+        _require_cpp(fibonacci_search_cpp, "fibonacci_search")
+        _require_cpp(fibonacci_search_h_cpp, "fibonacci_search_h")
+        _require_cpp(fibonacci_search_sorted_cpp, "fibonacci_search_sorted")
+
+        data = list(req.data)
+        target = req.target
+        search_data, search_target = _prepare_search_args(data, target)
+
+        raw_history = list(fibonacci_search_h_cpp(search_data, search_target))
+        history = [
+            {"current_index": int(idx), "history_mode": "fibonacci"}
+            for idx in raw_history
+            if 0 <= int(idx) < len(search_data)
+        ]
+
+        raw_result = list(fibonacci_search_cpp(search_data, search_target))
+        if isinstance(search_target, str):
+            visual_data = list(fibonacci_search_sorted_cpp(search_data, search_target))
+        else:
+            visual_data = list(fibonacci_search_sorted_cpp(search_data))
+        result = [int(idx) for idx in raw_result if 0 <= int(idx) < len(visual_data)]
+
+        return {
+            "result": result,
+            "history": history,
+            "visual_data": visual_data,
+            "visual_target": search_target,
+            "source": "cpp",
+            "history_source": "cpp",
+            "history_mode": "fibonacci",
         }
     except HTTPException:
         raise

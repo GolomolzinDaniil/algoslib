@@ -104,6 +104,12 @@ const SEARCH_META = {
         time: "Время: O(log n)",
         memory: "Память: О(1)",
     },
+    fibonacci_search: {
+        title: "Fibonacci Search",
+        desc: "Ищет элемент в отсортированном массиве, сужая область через числа Фибоначчи",
+        time: "Время: O(log n)",
+        memory: "Память: О(1)",
+    },
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -907,7 +913,11 @@ function renderSearchInputPreview() {
         syncSearchArrayToggle();
         return;
     }
-    renderSearchCells(searchPlot, data, -1, [], -1);
+    const algo = searchAlgoSelect?.value;
+    const activeIndexes = algo === 'binary_search' || algo === 'fibonacci_search'
+        ? data.map((_, idx) => idx)
+        : [];
+    renderSearchCells(searchPlot, data, -1, [], -1, activeIndexes);
     syncSearchArrayToggle();
 }
 
@@ -926,7 +936,29 @@ function isSameIndexOrder(left, right) {
     return true;
 }
 
-function appendFinalSearchResultStep(steps, resultIndexes) {
+function compareSearchValues(value, target) {
+    const useNumericCompare = typeof value === 'number' && typeof target === 'number';
+    const left = useNumericCompare ? value : String(value);
+    const right = useNumericCompare ? target : String(target);
+
+    if (left < right) return -1;
+    if (left > right) return 1;
+    return 0;
+}
+
+function addSearchExcludedRange(excludedSet, fromIndex, toIndex, dataLength) {
+    if (!excludedSet || !Number.isInteger(dataLength) || dataLength <= 0) return;
+    const from = Math.max(0, Math.min(fromIndex, dataLength - 1));
+    const to = Math.max(0, Math.min(toIndex, dataLength - 1));
+    const start = Math.min(from, to);
+    const end = Math.max(from, to);
+
+    for (let idx = start; idx <= end; idx++) {
+        excludedSet.add(idx);
+    }
+}
+
+function appendFinalSearchResultStep(steps, resultIndexes, historyMode = null) {
     const safeSteps = Array.isArray(steps) ? [...steps] : [];
     if (!Array.isArray(resultIndexes) || resultIndexes.length === 0) return safeSteps;
 
@@ -943,6 +975,9 @@ function appendFinalSearchResultStep(steps, resultIndexes) {
         : [];
     const lastActiveIndices = Array.isArray(lastStep.active_indices)
         ? lastStep.active_indices
+        : [];
+    const lastExcludedIndices = Array.isArray(lastStep.excluded_indices)
+        ? lastStep.excluded_indices
         : [];
 
     if (lastCurrentIndices.length === 0 && isSameIndexOrder(lastFoundIndices, resultIndexes)) {
@@ -963,7 +998,9 @@ function appendFinalSearchResultStep(steps, resultIndexes) {
         checked_until: checkedUntil,
         found_indices: [...resultIndexes],
         active_indices: [...lastActiveIndices],
+        excluded_indices: [...lastExcludedIndices],
         is_match: true,
+        history_mode: historyMode,
     });
 
     return safeSteps;
@@ -991,8 +1028,10 @@ function prependInitialSearchStep(steps, dataLength) {
             checked_until: -1,
             found_indices: [],
             active_indices: [],
+            excluded_indices: [],
             is_match: false,
             is_initial_state: true,
+            history_mode: firstStep.history_mode || null,
         },
         ...safeSteps,
     ];
@@ -1013,6 +1052,67 @@ function buildSearchSteps(data, resultIndexes, historyIndexes = [], target = nul
     const hasPairHistory = rawHistory.some((item) => Array.isArray(item));
 
     if (hasObjectHistory) {
+        const hasFibonacciHistory = rawHistory.some(
+            (item) => item && typeof item === 'object' && item.history_mode === 'fibonacci'
+        );
+
+        if (hasFibonacciHistory) {
+            const fibonacciHistory = rawHistory
+                .map((item) => {
+                    if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+                    const idx = Number(item.current_index);
+                    if (!Number.isInteger(idx) || idx < 0 || idx >= safeData.length) return null;
+                    return idx;
+                })
+                .filter((idx) => idx !== null);
+
+            if (fibonacciHistory.length === 0) {
+                return appendFinalSearchResultStep([], safeResultIndexes, 'fibonacci');
+            }
+
+            let possibleLeft = 0;
+            let possibleRight = safeData.length - 1;
+            const excludedSet = new Set();
+            const activeIndexes = safeData.map((_, idx) => idx);
+
+            for (const idx of fibonacciHistory) {
+                const comparison = compareSearchValues(safeData[idx], target);
+                const isMatch = resultSet.has(idx) || comparison === 0;
+                if (isMatch && !foundSet.has(idx)) {
+                    foundSet.add(idx);
+                    foundSoFar.push(idx);
+                }
+
+                if (isMatch) {
+                    possibleLeft = 0;
+                    possibleRight = safeData.length - 1;
+                } else if (comparison < 0) {
+                    possibleLeft = Math.max(possibleLeft, Math.min(idx + 1, safeData.length));
+                    addSearchExcludedRange(excludedSet, 0, idx, safeData.length);
+                } else if (!isMatch && comparison > 0) {
+                    possibleRight = Math.min(possibleRight, Math.max(idx - 1, -1));
+                    addSearchExcludedRange(excludedSet, idx, safeData.length - 1, safeData.length);
+                }
+
+                steps.push({
+                    current_indices: [idx],
+                    current_index: idx,
+                    checked_until: idx,
+                    found_indices: [...foundSoFar],
+                    active_indices: activeIndexes,
+                    excluded_indices: [...excludedSet],
+                    is_match: isMatch,
+                    left_index: possibleLeft,
+                    right_index: possibleRight,
+                    compared_value: safeData[idx],
+                    target_value: target,
+                    history_mode: 'fibonacci',
+                });
+            }
+
+            return appendFinalSearchResultStep(steps, safeResultIndexes, 'fibonacci');
+        }
+
         const objectHistory = rawHistory
             .map((item) => {
                 if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
@@ -1040,35 +1140,52 @@ function buildSearchSteps(data, resultIndexes, historyIndexes = [], target = nul
             .filter((item) => item !== null);
 
         if (objectHistory.length === 0) {
-            return appendFinalSearchResultStep([], safeResultIndexes);
+            return appendFinalSearchResultStep([], safeResultIndexes, 'binary');
         }
 
         const activeSet = new Set();
+        const excludedSet = new Set();
         for (const stepData of objectHistory) {
             const idx = stepData.mid;
-            const isMatch = stepData.isMatch || resultSet.has(idx);
-            activeSet.add(idx);
+            const comparison = compareSearchValues(safeData[idx], target);
+            const isMatch = stepData.isMatch || resultSet.has(idx) || comparison === 0;
+            safeData.forEach((_, activeIdx) => activeSet.add(activeIdx));
 
             if (isMatch && !foundSet.has(idx)) {
                 foundSet.add(idx);
                 foundSoFar.push(idx);
             }
 
+            let leftIndex = stepData.left;
+            let rightIndex = stepData.right;
+            if (isMatch) {
+                leftIndex = 0;
+                rightIndex = safeData.length - 1;
+            } else if (comparison < 0) {
+                leftIndex = Math.max(stepData.left, Math.min(idx + 1, safeData.length));
+                addSearchExcludedRange(excludedSet, 0, idx, safeData.length);
+            } else if (comparison > 0) {
+                rightIndex = Math.min(stepData.right, Math.max(idx - 1, -1));
+                addSearchExcludedRange(excludedSet, idx, safeData.length - 1, safeData.length);
+            }
+
             steps.push({
                 current_indices: [idx],
                 current_index: idx,
-                checked_until: stepData.right,
+                checked_until: rightIndex,
                 found_indices: [...foundSoFar],
                 is_match: isMatch,
-                left_index: stepData.left,
-                right_index: stepData.right,
+                left_index: leftIndex,
+                right_index: rightIndex,
                 compared_value: safeData[idx],
                 target_value: target,
                 active_indices: [...activeSet],
+                excluded_indices: [...excludedSet],
+                history_mode: 'binary',
             });
         }
 
-        return appendFinalSearchResultStep(steps, safeResultIndexes);
+        return appendFinalSearchResultStep(steps, safeResultIndexes, 'binary');
     }
 
     if (hasPairHistory) {
@@ -1144,16 +1261,17 @@ function buildSearchSteps(data, resultIndexes, historyIndexes = [], target = nul
 
 function applySearchResult(apiResult, data, target) {
     const visualData = Array.isArray(apiResult?.visual_data) ? apiResult.visual_data : data;
+    const visualTarget = apiResult?.visual_target ?? target;
     const resultIndexes = Array.isArray(apiResult?.result) ? apiResult.result : [];
     const historyIndexes = Array.isArray(apiResult?.history) ? apiResult.history : [];
-    const builtSteps = buildSearchSteps(visualData, resultIndexes, historyIndexes, target);
+    const builtSteps = buildSearchSteps(visualData, resultIndexes, historyIndexes, visualTarget);
     const steps = prependInitialSearchStep(builtSteps, visualData.length);
 
     searchData = {
         steps,
         initialArray: [...visualData],
         result: [...resultIndexes],
-        target,
+        target: visualTarget,
         source: apiResult?.source || 'cpp',
         historySource: apiResult?.history_source || apiResult?.source || 'cpp',
     };
@@ -1186,7 +1304,8 @@ function applySearchResult(apiResult, data, target) {
         firstStep.current_indices || firstStep.current_index,
         firstStep.found_indices,
         firstStep.checked_until,
-        firstStep.active_indices
+        firstStep.active_indices,
+        firstStep.excluded_indices
     );
 
     syncSearchArrayToggle();
@@ -1305,6 +1424,9 @@ if (searchExampleBtn) {
         if (algo === 'binary_search') {
             searchDataInput.value = '12, 5, 9, 1, 7, 3, 10, 2, 8, 6, 4, 11';
             searchTargetInput.value = '8';
+        } else if (algo === 'fibonacci_search') {
+            searchDataInput.value = '21 3 13 8 5 34 2 1';
+            searchTargetInput.value = '13';
         } else if (algo === 'linear_searche_both_sides') {
             searchDataInput.value = '14, 3, 9, 1, 7, 18, 5, 11, 6, 2';
             searchTargetInput.value = '11';

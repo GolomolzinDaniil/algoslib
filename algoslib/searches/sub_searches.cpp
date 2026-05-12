@@ -7,6 +7,7 @@
 #include "linear_searche.hpp"
 #include "linear_searche_both_sides.hpp"
 #include "binary_search.hpp"
+#include "fibonacci_search.hpp"
 
 namespace py = pybind11;
 
@@ -177,4 +178,68 @@ PYBIND11_MODULE(sub_searches, m)
         py::arg("data"),
         py::arg("target_hint"),
         "Returns text array sorted for binary search (via bubble_sort).");
+
+    m.def(
+        "fibonacci_search_h",
+        [](const py::list &data, std::int64_t target)
+        {
+            auto vec = cast_list<std::int64_t>(data);
+            return fibonacci_search_h<std::int64_t>(vec, target);
+        },
+        py::arg("data"),
+        py::arg("target"),
+        "Fibonacci search history. Returns visited indexes in sorted array.");
+    m.def(
+        "fibonacci_search_h",
+        [](const py::list &data, const std::string &target)
+        {
+            auto vec = cast_string_list(data);
+            return fibonacci_search_h<std::string>(vec, target);
+        },
+        py::arg("data"),
+        py::arg("target"),
+        "Fibonacci search history for text values. Returns visited indexes in sorted array.");
+
+    m.def(
+        "fibonacci_search",
+        [](const py::list &data, std::int64_t target)
+        {
+            auto vec = cast_list<std::int64_t>(data);
+            const auto idx = fibonacci_search<std::int64_t>(vec, target);
+            return idx < vec.size() ? std::vector<std::size_t>{idx} : std::vector<std::size_t>{};
+        },
+        py::arg("data"),
+        py::arg("target"),
+        "Fibonacci search. Returns found index in sorted array.");
+    m.def(
+        "fibonacci_search",
+        [](const py::list &data, const std::string &target)
+        {
+            auto vec = cast_string_list(data);
+            const auto idx = fibonacci_search<std::string>(vec, target);
+            return idx < vec.size() ? std::vector<std::size_t>{idx} : std::vector<std::size_t>{};
+        },
+        py::arg("data"),
+        py::arg("target"),
+        "Fibonacci search for text values. Returns found index in sorted array.");
+
+    m.def(
+        "fibonacci_search_sorted",
+        [](const py::list &data)
+        {
+            const auto vec = cast_list<std::int64_t>(data);
+            return binary_search_sorted<std::int64_t>(vec);
+        },
+        py::arg("data"),
+        "Returns array sorted for fibonacci search.");
+    m.def(
+        "fibonacci_search_sorted",
+        [](const py::list &data, const std::string &)
+        {
+            const auto vec = cast_string_list(data);
+            return binary_search_sorted<std::string>(vec);
+        },
+        py::arg("data"),
+        py::arg("target_hint"),
+        "Returns text array sorted for fibonacci search.");
 }

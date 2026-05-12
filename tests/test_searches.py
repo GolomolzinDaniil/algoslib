@@ -2,10 +2,14 @@ import asyncio
 
 from algoslib.server.routers.searches import (
     SearchRequest,
+    run_fibonacci_search,
     run_binary_search,
     run_linear_searche,
 )
 from algoslib.searches.sub_searches import (
+    fibonacci_search,
+    fibonacci_search_h,
+    fibonacci_search_sorted,
     linear_searche,
     linear_searche_both_sides,
     linear_searche_both_sides_h,
@@ -130,3 +134,31 @@ def test_binary_search_router_history_uses_indexes_for_text_values():
             "is_match": True,
         }
     ]
+
+
+def test_fibonacci_search_found_in_sorted_result():
+    arr = [21, 3, 13, 8, 5, 34, 2, 1]
+    assert fibonacci_search_sorted(arr) == [1, 2, 3, 5, 8, 13, 21, 34]
+    assert fibonacci_search(arr, 13) == [5]
+
+
+def test_fibonacci_search_text_values():
+    arr = ["delta", "alpha", "charlie", "bravo"]
+    assert fibonacci_search_sorted(arr, "") == ["alpha", "bravo", "charlie", "delta"]
+    assert fibonacci_search(arr, "charlie") == [2]
+
+
+def test_fibonacci_search_history_uses_indexes():
+    arr = [21, 3, 13, 8, 5, 34, 2, 1]
+    history = fibonacci_search_h(arr, 13)
+    assert history[-1] == 5
+
+
+def test_fibonacci_search_router_visualization_contract():
+    response = asyncio.run(run_fibonacci_search(SearchRequest(data=[21, 3, 13, 8, 5, 34, 2, 1], target=13)))
+    assert response["visual_data"] == [1, 2, 3, 5, 8, 13, 21, 34]
+    assert response["result"] == [5]
+    assert response["history"][-1] == {
+        "current_index": 5,
+        "history_mode": "fibonacci",
+    }
