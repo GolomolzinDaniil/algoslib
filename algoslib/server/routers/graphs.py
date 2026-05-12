@@ -26,6 +26,12 @@ class BellmanFordRequest(BaseModel):
 class KruskalRequest(BaseModel):
     edges: list[list[str]]
 
+
+class PrimRequest(BaseModel):
+    edges: list[list[str]]
+    start_node: str
+
+
 class FordFulkersonRequest(BaseModel):
     edges: list[list[str]]
     start_node: str
@@ -373,6 +379,62 @@ async def run_kruskal(req: KruskalRequest):
             "edges": parsed_edges,
             "nodes": sorted(nodes),
             "node_labels": node_labels,
+        }
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
+@router.post("/prim")
+async def run_prim(req: PrimRequest):
+    try:
+        from algoslib.graphs import Weighted_Graph, prim
+
+        if prim is None:
+            raise HTTPException(
+                status_code=501,
+                detail="Prim недоступен. Пересоберите sub_graphs.",
+            )
+
+        label_to_id, node_labels, start_label = _build_label_maps(req.edges, req.start_node)
+        parsed_edges = _parse_weighted_edges(req.edges, label_to_id)
+
+        graph = Weighted_Graph()
+        nodes = set()
+        for u, v, w in parsed_edges:
+            graph.add_edge(u, v, w)
+            nodes.add(u)
+            nodes.add(v)
+
+        steps = prim(graph, label_to_id[start_label])
+
+        result_steps = []
+        for step in steps:
+            mst_edges = []
+            for e in step.mst_edges:
+                mst_edges.append([int(e[0]), int(e[1]), float(e[2])])
+            result_steps.append({
+                "current_node": int(step.current_node),
+                "edge_from": int(step.edge_from),
+                "edge_to": int(step.edge_to),
+                "edge_weight": float(step.edge_weight),
+                "accepted": bool(step.accepted),
+                "visited": [int(x) for x in step.visited],
+                "queue": [int(x) for x in step.queue],
+                "mst_edges": mst_edges,
+                "total_weight": float(step.total_weight),
+            })
+
+        return {
+            "steps": result_steps,
+            "edges": parsed_edges,
+            "nodes": sorted(nodes),
+            "node_labels": node_labels,
+            "start": label_to_id[start_label],
         }
     except HTTPException:
         raise

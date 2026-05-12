@@ -6,6 +6,7 @@
 #include "dijkstra.hpp"
 #include "bellman_ford.hpp"
 #include "kruskal.hpp"
+#include "prim.hpp"
 #include "stalin_sort.hpp"
 #include "ford_fulkerson.hpp"
 #include "edmonds_karp.hpp"
@@ -103,6 +104,22 @@ PYBIND11_MODULE(sub_graphs, m) {
           py::arg("graph"),
           "Алгоритм Краскала. Возвращает список шагов (List[Kruskal_Step]). "
           "Строит минимальное остовное дерево.");
+
+    py::class_<Prim_Step>(m, "Prim_Step")
+        .def_readonly("current_node", &Prim_Step::current_node)
+        .def_readonly("edge_from", &Prim_Step::edge_from)
+        .def_readonly("edge_to", &Prim_Step::edge_to)
+        .def_readonly("edge_weight", &Prim_Step::edge_weight)
+        .def_readonly("accepted", &Prim_Step::accepted)
+        .def_readonly("visited", &Prim_Step::visited)
+        .def_readonly("queue", &Prim_Step::queue)
+        .def_readonly("mst_edges", &Prim_Step::mst_edges)
+        .def_readonly("total_weight", &Prim_Step::total_weight);
+
+    m.def("prim",
+          &prim,
+          py::arg("graph"), py::arg("start_node"),
+          "Алгоритм Прима. Возвращает список шагов (List[Prim_Step]).");
 
     // Структура шага алгоритма Сталин-сорта для графов
     py::class_<Stalin_Step>(m, "Stalin_Step")

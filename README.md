@@ -37,6 +37,7 @@
 - Dijkstra
 - Bellman-Ford
 - Kruskal
+- Prim
 - Ford-Fulkerson
 - Edmonds-Karp
 - Tarjan
@@ -56,6 +57,13 @@ source .venv/bin/activate
 
 pip install -r requirements.txt
 python setup.py build_ext --inplace
+python -m algoslib.server
+```
+
+Windows / PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\collect.ps1
 python -m algoslib.server
 ```
 
