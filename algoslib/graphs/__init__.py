@@ -89,6 +89,13 @@ except ImportError:
     DSU_Step = None
     connected_components = None
 
+try:
+    from .sub_graphs import ColoringStep, greedy_coloring
+except ImportError:
+    ColoringStep = None
+    greedy_coloring = None
+
+
 __all__ = ['bfs', 'Graph', 'BFS_Step', 'Weighted_Graph', 'Dijkstra_Step', 'dijkstra',
            'Ford_Step', 'bellman_ford', 'Kruskal_Step', 'kruskal', 'Prim_Step', 'prim',
            'Stalin_Step', 'stalin_sort',
@@ -99,5 +106,5 @@ __all__ = ['bfs', 'Graph', 'BFS_Step', 'Weighted_Graph', 'Dijkstra_Step', 'dijks
            'Tarjan_Step', 'tarjan_scc', 'OrientedGraph', 'Kosaraju_Step', 'kosaraju_scc',
            'Directed_Weighted_Graph', 'AStar_Step', 'astar_pathfinding',
            'BiDijkstra_Step', 'bidijkstra', "TopoStep", "topological_sort",
-           "DSU_Step", "connected_components",
+           "DSU_Step", "connected_components", 'ColoringStep', 'greedy_coloring',
           ]

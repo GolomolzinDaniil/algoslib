@@ -51,6 +51,7 @@ extensions = [
             'lib/graphs/src/bidijkstra.cpp',
             'lib/graphs/src/topo_sort.cpp',
             'lib/graphs/src/dsu.cpp',
+            'lib/graphs/src/coloring.cpp',
         ],
         include_dirs=[
             pybind11.get_include(),

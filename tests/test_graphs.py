@@ -1395,3 +1395,44 @@ def test_dsu_history_structure():
     assert union_step.components_count == 1
 
     assert steps[-1].action == "done"
+
+
+def test_coloring_empty():
+    g = Graph()
+    steps = greedy_coloring(g)
+    assert len(steps) == 0
+
+def test_coloring_single_node():
+    g = Graph()
+    g.add_edge(0, 0)  # Петля (но в неориентированном графе это ок)
+    steps = greedy_coloring(g)
+    assert steps[-1].used_colors >= 1
+
+def test_coloring_triangle():
+    """Треугольник требует 3 цвета"""
+    g = Graph()
+    g.add_edge(0, 1)
+    g.add_edge(1, 2)
+    g.add_edge(2, 0)
+    steps = greedy_coloring(g)
+    final = steps[-1]
+    assert final.used_colors == 3
+    # Все вершины должны иметь разные цвета
+    colors = [final.color_assignment[i] for i in range(3)]
+    assert len(set(colors)) == 3
+
+def test_coloring_bipartite():
+    """Двудольный граф требует 2 цвета"""
+    g = Graph()
+    g.add_edge(0, 2)
+    g.add_edge(0, 3)
+    g.add_edge(1, 2)
+    g.add_edge(1, 3)
+    steps = greedy_coloring(g)
+    assert steps[-1].used_colors == 2
+
+def test_coloring_step_type():
+    g = Graph()
+    g.add_edge(0, 1)
+    steps = greedy_coloring(g)
+    assert all(isinstance(s, ColoringStep) for s in steps)
