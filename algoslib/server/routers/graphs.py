@@ -79,6 +79,8 @@ class TopoSortRequest(BaseModel):
 class DSURequest(BaseModel):
     edges: list[list[str]]  
 
+class ColoringRequest(BaseModel):
+    edges: list[list[str]]  
 
 def _normalize_label(value: str) -> str:
     label = str(value).strip()
@@ -1031,6 +1033,44 @@ async def run_dsu(req: DSURequest):
         return {
             "steps": result_steps, "edges": parsed_edges, "nodes": sorted(nodes),
             "node_labels": node_labels, "algorithm": "connected_components"
+        }
+    except HTTPException: raise
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
+@router.post("/graph_coloring")
+async def run_coloring(req: ColoringRequest):
+    try:
+        from algoslib.graphs import Graph, greedy_coloring
+        if greedy_coloring is None:
+            raise HTTPException(status_code=501, detail="Graph Coloring недоступен.")
+
+        label_to_id, node_labels = _build_label_maps_no_start(req.edges)
+        parsed_edges = _parse_unweighted_edges(req.edges, label_to_id)
+
+        graph = Graph()
+        nodes = set()
+        for u, v in parsed_edges:
+            graph.add_edge(u, v)
+            nodes.add(u); nodes.add(v)
+
+        steps = greedy_coloring(graph)
+        result_steps = []
+        for step in steps:
+            result_steps.append({
+                "current_node": int(step.current_node) if step.current_node != -1 else None,
+                "color_assignment": {str(k): int(v) for k, v in step.color_assignment.items()},
+                "used_colors": int(step.used_colors),
+                "conflict": bool(step.conflict),
+                "available_colors": [int(c) for c in step.available_colors],
+                "action": step.action,
+            })
+
+        return {
+            "steps": result_steps, "edges": parsed_edges, "nodes": sorted(nodes),
+            "node_labels": node_labels, "algorithm": "graph_coloring"
         }
     except HTTPException: raise
     except Exception as e:

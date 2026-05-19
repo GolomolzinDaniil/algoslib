@@ -1242,3 +1242,65 @@ export function updateDSUStep(svg, nodes, edges, step, nodeLabels = {}) {
     }
     return lines.join('<br>');
 }
+
+// Палитра цветов для раскраски
+const COLOR_PALETTE = ['#f44747', '#4ec9b0', '#ce9178', '#89b4fa', '#cba6f7', '#f9e2af', '#a6e3a1', '#74c7ec'];
+
+export function updateColoringStep(svg, nodes, edges, step, nodeLabels = {}) {
+    const current = step.current_node;
+    const colors = step.color_assignment || {};
+    
+    // Раскраска вершин
+    const nodeColors = {};
+    for (const n of nodes) {
+        if (colors[n] !== undefined) {
+            nodeColors[n] = COLOR_PALETTE[colors[n] % COLOR_PALETTE.length];
+        } else {
+            nodeColors[n] = '#3e3e42';  // Не раскрашена
+        }
+    }
+    // Текущая вершина — подсветка
+    if (current !== null && current !== -1) {
+        nodeColors[current] = COLORS.current;
+    }
+
+    draw(svg, nodes, edges, false, nodeColors, {}, null, null, nodeLabels, null);
+
+    const lines = [];
+    const actLabels = {
+        'init': 'Инициализация: все вершины не раскрашены',
+        'conflict_check': 'Проверка цветов соседей',
+        'assign': `Цвет назначен: ${step.available_colors?.[0] ?? '?'}`,
+        'done': 'Раскраска завершена'
+    };
+    lines.push(`<span class="label">Действие:</span> <span class="value">${actLabels[step.action] || step.action}</span>`);
+    
+    if (current !== null && current !== -1) {
+        lines.push(`<span class="label">Вершина:</span> <span class="value">${getNodeLabel(current, nodeLabels)}</span>`);
+    }
+    
+    if (step.available_colors?.length > 0 && step.action === 'assign') {
+        const avail = step.available_colors.map(c => 
+            `<span style="display:inline-block;width:12px;height:12px;background:${COLOR_PALETTE[c % COLOR_PALETTE.length]};border-radius:2px;margin:0 2px"></span>${c}`
+        ).join(', ');
+        lines.push(`<span class="label">Доступные цвета:</span> <span class="value">${avail}</span>`);
+    }
+    
+    lines.push(`<span class="label">Использовано цветов:</span> <span class="value">${step.used_colors}</span>`);
+    
+    if (step.action === 'done') {
+        const groups = {};
+        for (const [n, c] of Object.entries(colors)) {
+            if (!groups[c]) groups[c] = [];
+            groups[c].push(getNodeLabel(n, nodeLabels));
+        }
+        const byColor = Object.entries(groups)
+            .sort((a, b) => Number(a[0]) - Number(b[0]))
+            .map(([c, nodes]) => 
+                `<span style="color:${COLOR_PALETTE[c % COLOR_PALETTE.length]}">■</span> Цвет ${c}: {${nodes.join(', ')}}`
+            ).join('<br>');
+        lines.push(`<span class="label">По цветам:</span><br><span class="value">${byColor}</span>`);
+    }
+    
+    return lines.join('<br>');
+}
