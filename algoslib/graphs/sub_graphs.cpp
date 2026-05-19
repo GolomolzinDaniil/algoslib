@@ -18,6 +18,7 @@
 #include "bidijkstra.hpp"
 #include "topo_sort.hpp"
 #include "dsu.hpp"
+#include "coloring.hpp"
 
 namespace py = pybind11;
 
@@ -407,4 +408,15 @@ PYBIND11_MODULE(sub_graphs, m) {
 
     m.def("connected_components", &connected_components, py::arg("graph"),
           "Поиск компонент связности (Union-Find / DSU). Возвращает List[DSU_Step].");
+
+        py::class_<ColoringStep>(m, "ColoringStep")
+        .def_readonly("current_node", &ColoringStep::current_node)
+        .def_readonly("color_assignment", &ColoringStep::color_assignment)
+        .def_readonly("used_colors", &ColoringStep::used_colors)
+        .def_readonly("conflict", &ColoringStep::conflict)
+        .def_readonly("available_colors", &ColoringStep::available_colors)
+        .def_readonly("action", &ColoringStep::action);
+
+    m.def("greedy_coloring", &greedy_coloring, py::arg("graph"),
+          "Жадная раскраска графа. Возвращает List[ColoringStep].");
 }
