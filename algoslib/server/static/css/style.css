@@ -720,7 +720,6 @@ input[type="range"] {
     height: 14px;
 }
 
-/* === Тултип с описанием алгоритма === */
 .algo-tooltip {
     margin-top: 8px;
     padding: 12px 14px;
