@@ -692,7 +692,6 @@ input[type="range"] {
     }
 }
 
-/* === Кнопка информации об алгоритме === */
 .info-btn {
     background: var(--border);
     color: var(--text-muted);
