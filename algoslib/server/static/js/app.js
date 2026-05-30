@@ -75,6 +75,104 @@ const SUBSTRING_META = {
         memory: "Память: O(Σ)",
     }
 };
+const GRAPH_ALGO_META = {
+    bfs: {
+        title: "BFS (Поиск в ширину)",
+        desc: "Обходит граф уровень за уровнем, используя очередь. Находит кратчайший путь в невзвешенном графе.",
+        time: "Время: O(V+E)",
+        memory: "Память: O(V)"
+    },
+    dijkstra: {
+        title: "Dijkstra",
+        desc: "Находит кратчайшие пути от стартовой вершины во взвешенном графе без отрицательных рёбер.",
+        time: "Время: O((V+E) log V)",
+        memory: "Память: O(V)"
+    },
+    bellman_ford: {
+        title: "Bellman-Ford",
+        desc: "Находит кратчайшие пути, поддерживает отрицательные веса. Обнаруживает отрицательные циклы.",
+        time: "Время: O(V·E)",
+        memory: "Память: O(V)"
+    },
+    kruskal: {
+        title: "Kruskal (MST)",
+        desc: "Строит минимальное остовное дерево, добавляя рёбра в порядке возрастания веса (без циклов).",
+        time: "Время: O(E log E)",
+        memory: "Память: O(V)"
+    },
+    stalin_sort: {
+        title: "Stalin Sort (Клика)",
+        desc: "Находит максимальную клику в графе, 'удаляя' вершины, не связанные с текущей кликой.",
+        time: "Время: O(V²)",
+        memory: "Память: O(V)"
+    },
+    ford_fulkerson: {
+        title: "Ford-Fulkerson (Макс. поток)",
+        desc: "Находит максимальный поток в сети, последовательно находя увеличивающие пути.",
+        time: "Время: O(E·max_flow)",
+        memory: "Память: O(V+E)"
+    },
+    edmonds_karp: {
+        title: "Edmonds-Karp",
+        desc: "Оптимизация Форда-Фалкерсона с использованием BFS для поиска увеличивающих путей.",
+        time: "Время: O(V·E²)",
+        memory: "Память: O(V+E)"
+    },
+    tarjan: {
+        title: "Tarjan (SCC)",
+        desc: "Находит сильно связные компоненты за один проход DFS с использованием lowlink-значений.",
+        time: "Время: O(V+E)",
+        memory: "Память: O(V)"
+    },
+    kosaraju: {
+        title: "Kosaraju (SCC)",
+        desc: "Находит сильно связные компоненты в два прохода: прямой и обратный обход графа.",
+        time: "Время: O(V+E)",
+        memory: "Память: O(V)"
+    },
+    hierholzer: {
+        title: "Hierholzer (Эйлеров путь)",
+        desc: "Находит эйлеров цикл или путь в графе, где все вершины имеют чётную степень.",
+        time: "Время: O(E)",
+        memory: "Память: O(V+E)"
+    },
+    hamiltonian: {
+        title: "Hamiltonian (Backtracking)",
+        desc: "Ищет гамильтонов путь/цикл методом возврата. Экспоненциальная сложность.",
+        time: "Время: O(V!)",
+        memory: "Память: O(V)"
+    },
+    astar: {
+        title: "A* Pathfinding",
+        desc: "Эвристический поиск кратчайшего пути. Использует оценку расстояния до цели для ускорения.",
+        time: "Время: O(E log V)*",
+        memory: "Память: O(V)"
+    },
+    bidijkstra: {
+        title: "Bi-Dijkstra",
+        desc: "Запускает два поиска Дейкстры навстречу друг другу. Встреча фронтов даёт кратчайший путь.",
+        time: "Время: O((V+E) log V)*",
+        memory: "Память: O(V)"
+    },
+    topological_sort: {
+        title: "Topological Sort (Kahn)",
+        desc: "Упорядочивает вершины DAG так, что все рёбра идут слева направо. Обнаруживает циклы.",
+        time: "Время: O(V+E)",
+        memory: "Память: O(V)"
+    },
+    connected_components: {
+        title: "Connected Components (DSU)",
+        desc: "Находит компоненты связности в неориентированном графе с помощью системы непересекающихся множеств.",
+        time: "Время: O(E·α(V))",
+        memory: "Память: O(V)"
+    },
+    graph_coloring: {
+        title: "Graph Coloring (Greedy)",
+        desc: "Раскрашивает вершины графа так, чтобы соседние имели разные цвета. Жадный алгоритм.",
+        time: "Время: O(V+E)",
+        memory: "Память: O(V)"
+    }
+};
 
 const MAX_SORT_ITEMS = 15;
 const MAX_SORT_VISUAL_ITEMS = 15;
@@ -1917,6 +2015,53 @@ function wireControls(player, renderFn) {
 }
 
 wireControls(graphPlayer, renderGraphStepAt);
+
+// === Логика тултипа с описанием алгоритма ===
+const algoInfoBtn = document.getElementById('graph-algo-info');
+const algoTooltip = document.getElementById('graph-algo-tooltip');
+const tooltipTitle = document.getElementById('tooltip-title');
+const tooltipDesc = document.getElementById('tooltip-desc');
+const tooltipTime = document.getElementById('tooltip-time');
+const tooltipMemory = document.getElementById('tooltip-memory');
+const graphAlgoSelect = document.getElementById('graph-algo');
+
+function updateAlgoTooltip(algo) {
+    const meta = GRAPH_ALGO_META[algo];
+    if (!meta) return;
+    
+    tooltipTitle.textContent = meta.title;
+    tooltipDesc.textContent = meta.desc;
+    tooltipTime.textContent = meta.time;
+    tooltipMemory.textContent = meta.memory;
+}
+
+if (algoInfoBtn && algoTooltip) {
+    algoInfoBtn.addEventListener('mouseenter', () => {
+        const algo = graphAlgoSelect.value;
+        updateAlgoTooltip(algo);
+        algoTooltip.style.display = 'block';
+    });
+    
+    algoInfoBtn.addEventListener('mouseleave', () => {
+        algoTooltip.style.display = 'none';
+    });
+    
+    algoTooltip.addEventListener('mouseenter', () => {
+        algoTooltip.style.display = 'block';
+    });
+    algoTooltip.addEventListener('mouseleave', () => {
+        algoTooltip.style.display = 'none';
+    });
+}
+
+if (graphAlgoSelect) {
+    graphAlgoSelect.addEventListener('change', (e) => {
+        if (algoTooltip.style.display !== 'none') {
+            updateAlgoTooltip(e.target.value);
+        }
+    });
+    updateAlgoTooltip(graphAlgoSelect.value);
+}
 
 // --- SUBSTRINGS CONTROLS INIT ---
 substringPlayer.el.prev = document.getElementById('substring-prev');

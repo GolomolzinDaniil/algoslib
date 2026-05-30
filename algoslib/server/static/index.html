@@ -126,6 +126,17 @@
                         <option value="connected_components">Connected Components (DSU)</option>
                         <option value="graph_coloring">Graph Coloring (Greedy)</option>
                     </select>
+                    <button type="button" id="graph-algo-info" class="info-btn" title="Показать описание" aria-label="Описание алгоритма">
+                        <i data-lucide="info"></i>
+                    </button>
+                </div>
+                <div id="graph-algo-tooltip" class="algo-tooltip" style="display: none;">
+                    <div class="algo-tooltip-title" id="tooltip-title">BFS</div>
+                    <div class="algo-tooltip-desc" id="tooltip-desc">Поиск в ширину обходит граф уровень за уровнем</div>
+                    <div class="algo-tooltip-meta">
+                        <span id="tooltip-time">Время: O(V+E)</span>
+                        <span id="tooltip-memory">Память: O(V)</span>
+                    </div>
                 </div>
                 <div class="input-row vertical">
                     <label id="edges-label">Рёбра (по одному на строку: u v):</label>
