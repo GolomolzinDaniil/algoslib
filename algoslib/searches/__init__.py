@@ -7,6 +7,9 @@ try:
         binary_search,
         binary_search_h,
         binary_search_sorted,
+        exponential_search,
+        exponential_search_h,
+        exponential_search_sorted,
     )
 except ImportError:
     linear_searche = None
@@ -16,6 +19,9 @@ except ImportError:
     binary_search = None
     binary_search_h = None
     binary_search_sorted = None
+    exponential_search = None
+    exponential_search_h = None
+    exponential_search_sorted = None
 
 __all__ = [
     "linear_searche",
@@ -25,4 +31,7 @@ __all__ = [
     "binary_search",
     "binary_search_h",
     "binary_search_sorted",
+    "exponential_search",
+    "exponential_search_h",
+    "exponential_search_sorted",
 ]

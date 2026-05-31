@@ -30,6 +30,7 @@
 - Linear Search
 - Bilinear Search
 - Binary Search
+- Exponential Search
 
 ### Графы
 

@@ -104,6 +104,12 @@ const SEARCH_META = {
         time: "Время: O(log n)",
         memory: "Память: О(1)",
     },
+    exponential_search: {
+        title: "Exponential Search",
+        desc: "Сначала находит диапазон, в котором может находиться элемент (экспоненциальное увеличение границ), затем выполняет бинарный поиск в найденном диапазоне",
+        time: "Время: O(log n)",
+        memory: "Память: О(1)",
+    },
 };
 
 document.addEventListener('DOMContentLoaded', () => {
