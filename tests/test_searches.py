@@ -5,6 +5,9 @@ from algoslib.searches.sub_searches import (
     binary_search,
     binary_search_h,
     binary_search_sorted,
+    exponential_search,
+    exponential_search_h,
+    exponential_search_sorted,
 )
 
 
@@ -80,3 +83,42 @@ def test_binary_search_history_contains_comparison_details():
         (0, 4, 2, 3, 4, False),
         (3, 4, 3, 4, 4, True),
     ]
+
+
+def test_exponential_search_sorted():
+    arr = [5, 1, 4, 2, 3]
+    assert exponential_search_sorted(arr) == [1, 2, 3, 4, 5]
+
+
+def test_exponential_search_empty():
+    assert exponential_search([], 10) == []
+
+
+def test_exponential_search_found_first_element():
+    arr = [5, 1, 4, 2, 3]
+    assert exponential_search(arr, 1) == [0]
+
+
+def test_exponential_search_found_via_binary_search():
+    arr = [5, 1, 4, 2, 3]
+    assert exponential_search(arr, 4) == [3]
+
+
+def test_exponential_search_not_found():
+    arr = [5, 1, 4, 2, 3]
+    assert exponential_search(arr, 9) == []
+
+
+def test_exponential_search_history_first_element():
+    arr = [1, 2, 3, 4, 5]
+    history = exponential_search_h(arr, 1)
+    assert history == [
+        (0, 0, 0, 1, 1, True),
+    ]
+
+
+def test_exponential_search_history_after_binary_search():
+    arr = [5, 1, 4, 2, 3]
+    history = exponential_search_h(arr, 4)
+    assert history[-1][5] == True  # last step is a match
+    assert history[-1][2] == 3  # found at sorted index 3

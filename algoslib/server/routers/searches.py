@@ -18,6 +18,9 @@ linear_searche_both_sides_h_cpp = getattr(sub_searches_cpp, "linear_searche_both
 binary_search_cpp = getattr(sub_searches_cpp, "binary_search", None) if sub_searches_cpp else None
 binary_search_h_cpp = getattr(sub_searches_cpp, "binary_search_h", None) if sub_searches_cpp else None
 binary_search_sorted_cpp = getattr(sub_searches_cpp, "binary_search_sorted", None) if sub_searches_cpp else None
+exponential_search_cpp = getattr(sub_searches_cpp, "exponential_search", None) if sub_searches_cpp else None
+exponential_search_h_cpp = getattr(sub_searches_cpp, "exponential_search_h", None) if sub_searches_cpp else None
+exponential_search_sorted_cpp = getattr(sub_searches_cpp, "exponential_search_sorted", None) if sub_searches_cpp else None
 
 router = APIRouter()
 
@@ -171,6 +174,53 @@ async def run_binary_search(req: SearchRequest):
 
         result = list(binary_search_cpp(normalized_data, normalized_target))
         visual_data = list(binary_search_sorted_cpp(normalized_data))
+
+        return {
+            "result": result,
+            "history": history,
+            "visual_data": visual_data,
+            "source": "cpp",
+            "history_source": "cpp",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
+@router.post("/exponential_search")
+async def run_exponential_search(req: SearchRequest):
+    try:
+        _require_cpp(exponential_search_cpp, "exponential_search")
+        _require_cpp(exponential_search_h_cpp, "exponential_search_h")
+        _require_cpp(exponential_search_sorted_cpp, "exponential_search_sorted")
+
+        data = list(req.data)
+        target = req.target
+        normalized_data, normalized_target = _get_normalized_cpp_args_or_400(data, target)
+
+        raw_history = list(exponential_search_h_cpp(normalized_data, normalized_target))
+        history = []
+        for step in raw_history:
+            left_idx = int(step[0]) if len(step) > 0 else 0
+            right_idx = int(step[1]) if len(step) > 1 else 0
+            mid_idx = int(step[2]) if len(step) > 2 else 0
+            compared_value = int(step[3]) if len(step) > 3 else 0
+            target_value = int(step[4]) if len(step) > 4 else normalized_target
+            is_match = bool(step[5]) if len(step) > 5 else False
+
+            history.append({
+                "left_index": left_idx,
+                "right_index": right_idx,
+                "mid_index": mid_idx,
+                "compared_value": compared_value,
+                "target_value": target_value,
+                "is_match": is_match,
+            })
+
+        result = list(exponential_search_cpp(normalized_data, normalized_target))
+        visual_data = list(exponential_search_sorted_cpp(normalized_data))
 
         return {
             "result": result,
