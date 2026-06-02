@@ -196,7 +196,7 @@ export function updateSubstringStep(container, steps, text, pattern, stepIndex) 
 
         if (isFound) {
             // Если найдено, приоритет отдается сообщению об успехе
-            msg = `✅ Индекс первого совпадения: ${foundPos}`;
+            msg = `Индекс первого совпадения: ${foundPos}`;
         } else if (tIdx >= 0 && pIdx >= 0) {
             const tChar = safeText[tIdx] || '?';
             const pChar = safePattern[pIdx] || '?';

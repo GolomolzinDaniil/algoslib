@@ -61,14 +61,14 @@ std::vector<ColoringStep> greedy_coloring(const Graph& graph) {
         // Шаг: назначение цвета
         color_assignment[u] = color;
         
-        // ✅ ИСПРАВЛЕНО: используем ->second для итератора
+        // ИСПРАВЛЕНО: используем ->second для итератора
         int max_color = 0;
         if (!color_assignment.empty()) {
             auto it = std::max_element(
                 color_assignment.begin(), color_assignment.end(),
                 [](const auto& a, const auto& b) { return a.second < b.second; }
             );
-            max_color = it->second;  // ✅ Правильный доступ к значению пары
+            max_color = it->second;  // Правильный доступ к значению пары
         }
         
         ColoringStep assign;
@@ -87,7 +87,7 @@ std::vector<ColoringStep> greedy_coloring(const Graph& graph) {
     done.color_assignment = color_assignment;
     done.used_colors = 0;
     
-    // ✅ ИСПРАВЛЕНО: тот же фикс для финального шага
+    // ИСПРАВЛЕНО: тот же фикс для финального шага
     if (!color_assignment.empty()) {
         auto it = std::max_element(
             color_assignment.begin(), color_assignment.end(),
