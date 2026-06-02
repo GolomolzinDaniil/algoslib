@@ -583,17 +583,17 @@ function formatCountingStatus(step, stepIndex, historyLength, initialArrayLength
         return `Старт: инициализация корзин${previewSuffix}`;
     }
     if (step.phase === 'build') {
-        return `📦 Сборка: ${step.bucket_value} записан в sorted[${step.write_index}]${previewSuffix}`;
+        return `Сборка: ${step.bucket_value} записан в sorted[${step.write_index}]${previewSuffix}`;
     }
     if (step.phase === 'done') {
         const output = normalizeCountingOutput(step).slice(0, maxVisible);
-        return `✅ Готово: [${output.join(', ')}]${previewSuffix}`;
+        return `Готово: [${output.join(', ')}]${previewSuffix}`;
     }
     if (isCppCountingStep(step) && stepIndex === historyLength - 1) {
-        return `✅ Подсчёт завершён${previewSuffix}`;
+        return `Подсчёт завершён${previewSuffix}`;
     }
     if (step.phase === 'count' || isCppCountingStep(step)) {
-        return `🔢 Подсчёт: a[${step.source_index}] = ${step.bucket_value} → корзина ${step.bucket_value} = ${step.bucket_count}${previewSuffix}`;
+        return `Подсчёт: a[${step.source_index}] = ${step.bucket_value} → корзина ${step.bucket_value} = ${step.bucket_count}${previewSuffix}`;
     }
     return `Шаг ${stepIndex + 1} из ${historyLength}${previewSuffix}`;
 }
@@ -762,19 +762,19 @@ export function formatStatus(data, step, idx, total, sourceLength = data.length)
             return `Старт: [${data.join(', ')}]${previewSuffix}`;
         }
         if (step.is_sorted) {
-            return `✅ Готово после ${idx} перемешиваний: [${data.join(', ')}]${previewSuffix}`;
+            return `Готово после ${idx} перемешиваний: [${data.join(', ')}]${previewSuffix}`;
         }
         if (idx === total - 1) {
-            return `❌ Лимит перемешиваний достигнут, порядок не найден${previewSuffix}`;
+            return `Лимит перемешиваний достигнут, порядок не найден${previewSuffix}`;
         }
-        return `❌ Перемешивание ${idx}: пока не отсортировано${previewSuffix}`;
+        return `Перемешивание ${idx}: пока не отсортировано${previewSuffix}`;
     }
 
     if (isInsertionStep(step)) {
         if (step.is_shift) {
-            return `↪ Сдвиг: ${step.value} из ${step.compare_a} в ${step.compare_b}${previewSuffix}`;
+            return `Сдвиг: ${step.value} из ${step.compare_a} в ${step.compare_b}${previewSuffix}`;
         }
-        return `📌 Вставка: ${step.value} в позицию ${step.compare_b}${previewSuffix}`;
+        return `Вставка: ${step.value} в позицию ${step.compare_b}${previewSuffix}`;
     }
 
     if (isCountingStep(step)) {
@@ -784,13 +784,13 @@ export function formatStatus(data, step, idx, total, sourceLength = data.length)
     if (idx === 0) {
         return `Старт: [${data.join(', ')}]${previewSuffix}`;
     } else if (idx === total - 1) {
-        return `✅ Готово: [${data.join(', ')}]${previewSuffix}`;
+        return `Готово: [${data.join(', ')}]${previewSuffix}`;
     }
 
     const { compareA, compareB } = getSwapCompareIndexes(step);
     if (step.is_swap) {
-        return `🔄 Обмен: ${compareA} ↔ ${compareB}`;
+        return `Обмен: ${compareA} ↔ ${compareB}`;
     } else {
-        return `🔍 Сравнение: ${compareA} и ${compareB}`;
+        return `Сравнение: ${compareA} и ${compareB}`;
     }
 }

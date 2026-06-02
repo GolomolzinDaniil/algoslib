@@ -44,7 +44,20 @@
         </div>
 
         <div class="input-panel">
-            <div class="input-row">
+            <div class="input-row sort-mode-row">
+                <label>Режим:</label>
+                <div class="sort-mode-toggle" role="radiogroup" aria-label="Режим сортировок">
+                    <button type="button" class="mode-btn active" data-sort-mode="single" aria-pressed="true">
+                        <i data-lucide="list"></i>
+                        <span>Обычный</span>
+                    </button>
+                    <button type="button" class="mode-btn" data-sort-mode="battle" aria-pressed="false">
+                        <i data-lucide="swords"></i>
+                        <span>Батл</span>
+                    </button>
+                </div>
+            </div>
+            <div class="input-row" id="sort-single-row">
                 <label>Алгоритм:</label>
                 <select id="sort-algo">
                     <option value="" disabled selected>Выберите алгоритм</option>
@@ -56,6 +69,32 @@
                     <option value="insertion">Insertion Sort</option>
                     <option value="counting">Counting Sort</option>
                 </select>
+            </div>
+            <div class="sort-battle-picker" id="sort-battle-picker" style="display:none">
+                <div class="battle-select-group">
+                    <label for="sort-battle-left">Слева:</label>
+                    <select id="sort-battle-left">
+                        <option value="bubble">Bubble Sort</option>
+                        <option value="selection">Selection Sort</option>
+                        <option value="gnome">Gnome Sort</option>
+                        <option value="bogo">Bogo Sort</option>
+                        <option value="quick" selected>Quick Sort</option>
+                        <option value="insertion">Insertion Sort</option>
+                        <option value="counting">Counting Sort</option>
+                    </select>
+                </div>
+                <div class="battle-select-group">
+                    <label for="sort-battle-right">Справа:</label>
+                    <select id="sort-battle-right">
+                        <option value="bubble" selected>Bubble Sort</option>
+                        <option value="selection">Selection Sort</option>
+                        <option value="gnome">Gnome Sort</option>
+                        <option value="bogo">Bogo Sort</option>
+                        <option value="quick">Quick Sort</option>
+                        <option value="insertion">Insertion Sort</option>
+                        <option value="counting">Counting Sort</option>
+                    </select>
+                </div>
             </div>
             <div class="input-row">
                 <label>Массив (через запятую, макс. 15):</label>
@@ -76,9 +115,40 @@
 
         </div>
 
-        <div class="viz-container">
+        <div class="viz-container" id="sort-single-viz">
             <div id="sort-plot" class="plot"></div>
         </div>
+        <div class="sort-battle-viz" id="sort-battle-viz" style="display:none">
+            <div class="battle-lane" id="sort-battle-left-lane">
+                <div class="battle-lane-header">
+                    <div>
+                        <div class="battle-side-label">Слева</div>
+                        <div class="battle-title" id="sort-battle-left-title">Quick Sort</div>
+                    </div>
+                    <div class="battle-result-badge" id="sort-battle-left-badge">Готов</div>
+                </div>
+                <div class="battle-metrics" id="sort-battle-left-metrics"></div>
+                <div class="battle-plot-wrap">
+                    <div id="sort-battle-left-plot" class="plot battle-plot"></div>
+                </div>
+                <div id="sort-battle-left-status" class="battle-lane-status"></div>
+            </div>
+            <div class="battle-lane" id="sort-battle-right-lane">
+                <div class="battle-lane-header">
+                    <div>
+                        <div class="battle-side-label">Справа</div>
+                        <div class="battle-title" id="sort-battle-right-title">Bubble Sort</div>
+                    </div>
+                    <div class="battle-result-badge" id="sort-battle-right-badge">Готов</div>
+                </div>
+                <div class="battle-metrics" id="sort-battle-right-metrics"></div>
+                <div class="battle-plot-wrap">
+                    <div id="sort-battle-right-plot" class="plot battle-plot"></div>
+                </div>
+                <div id="sort-battle-right-status" class="battle-lane-status"></div>
+            </div>
+        </div>
+        <div id="sort-battle-summary" class="battle-summary" style="display:none"></div>
 
         <div class="controls" id="sort-controls" style="display:none">
             <button class="btn" id="sort-prev">

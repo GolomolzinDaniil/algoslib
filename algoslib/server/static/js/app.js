@@ -218,6 +218,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initSortingPage() {
+    sortMode = 'single';
+    updateSortModeButtons();
+
     const header = document.getElementById('sort-header');
     if (header) {
         header.style.display = 'block';
@@ -239,8 +242,16 @@ function initSortingPage() {
     const controls = document.getElementById('sort-controls');
     if (controls) controls.style.display = 'none';
 
+    if (sortSingleRow) sortSingleRow.style.display = 'flex';
+    if (sortBattlePicker) sortBattlePicker.style.display = 'none';
+    if (sortSingleViz) sortSingleViz.style.display = 'flex';
+    if (sortBattleViz) sortBattleViz.style.display = 'none';
+    if (sortBattleSummary) sortBattleSummary.style.display = 'none';
+    if (sortDownloadFileBtn) sortDownloadFileBtn.style.display = 'inline-flex';
+
     if (sortFileInput) sortFileInput.value = '';
     uploadedSortData = null;
+    resetSortingSession();
 }
 
 function initSearchPage() {
@@ -325,21 +336,15 @@ document.querySelectorAll('.tab').forEach(tab => {
 document.getElementById('sort-algo').addEventListener('change', (e) => {
     const algo = e.target.value;
     resetSortingSession();
+    if (sortMode !== 'single') return;
 
     if (algo && SORTING_META[algo]) {
-        const meta = SORTING_META[algo];
         sortPlayer.el.controls.style.display = 'flex';
-        document.getElementById('sort-title').textContent = meta.title;
-        document.getElementById('sort-desc').textContent = meta.desc;
-        document.getElementById('sort-time').textContent = meta.time;
-        document.getElementById('sort-memory').textContent = meta.memory;
+        updateSortingHeaderForMode();
         renderSortInputPreview();
     } else {
         sortPlayer.el.controls.style.display = 'none';
-        document.getElementById('sort-title').textContent = 'Сортировки';
-        document.getElementById('sort-desc').textContent = 'Выберите алгоритм и введите массив';
-        document.getElementById('sort-time').textContent = '';
-        document.getElementById('sort-memory').textContent = '';
+        updateSortingHeaderForMode();
     }
 });
 
@@ -395,7 +400,7 @@ const searchPlayer = createPlayer('search');
 const substringPlayer = createPlayer('substring');
 
 let graphData = { nodes: [], edges: [], algorithm: 'bfs', nodeLabels: {}, source: null, sink: null };
-let sortData = { history: [], initialArray: [], sortedArray: [] };
+let sortData = { history: [], initialArray: [], sortedArray: [], direction: 'end' };
 let searchData = {
     steps: [],
     initialArray: [],
@@ -416,14 +421,62 @@ const sortDataInput = document.getElementById('sort-data');
 const sortFileInput = document.getElementById('sort-file');
 const sortFileName = document.getElementById('sort-file-name');
 const sortDownloadFileBtn = document.getElementById('sort-download-file');
+const sortModeButtons = document.querySelectorAll('[data-sort-mode]');
+const sortSingleRow = document.getElementById('sort-single-row');
+const sortBattlePicker = document.getElementById('sort-battle-picker');
+const sortSingleViz = document.getElementById('sort-single-viz');
+const sortBattleViz = document.getElementById('sort-battle-viz');
+const sortBattleSummary = document.getElementById('sort-battle-summary');
+const sortBattleEls = {
+    left: {
+        select: document.getElementById('sort-battle-left'),
+        lane: document.getElementById('sort-battle-left-lane'),
+        title: document.getElementById('sort-battle-left-title'),
+        metrics: document.getElementById('sort-battle-left-metrics'),
+        plot: document.getElementById('sort-battle-left-plot'),
+        status: document.getElementById('sort-battle-left-status'),
+        badge: document.getElementById('sort-battle-left-badge'),
+    },
+    right: {
+        select: document.getElementById('sort-battle-right'),
+        lane: document.getElementById('sort-battle-right-lane'),
+        title: document.getElementById('sort-battle-right-title'),
+        metrics: document.getElementById('sort-battle-right-metrics'),
+        plot: document.getElementById('sort-battle-right-plot'),
+        status: document.getElementById('sort-battle-right-status'),
+        badge: document.getElementById('sort-battle-right-badge'),
+    },
+};
 const searchPlot = document.getElementById('search-plot');
 const searchResultIndexes = document.getElementById('search-result-indexes');
 const searchDataInput = document.getElementById('search-data');
 const searchTargetInput = document.getElementById('search-target');
 const searchAlgoSelect = document.getElementById('search-algo');
 const searchArrayToggle = document.getElementById('search-array-toggle');
+let sortMode = 'single';
+let sortBattleData = createEmptyBattleData();
 let searchPlotCollapsed = true;
 let searchToggleRaf = null;
+
+sortModeButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+        setSortMode(button.dataset.sortMode);
+        if (sortMode === 'battle') {
+            sortPlayer.el.controls.style.display = 'flex';
+        } else if (!document.getElementById('sort-algo').value) {
+            sortPlayer.el.controls.style.display = 'none';
+        }
+    });
+});
+
+for (const side of ['left', 'right']) {
+    sortBattleEls[side]?.select?.addEventListener('change', () => {
+        if (sortMode !== 'battle') return;
+        resetSortingSession();
+        sortPlayer.el.controls.style.display = 'flex';
+        renderSortInputPreview();
+    });
+}
 
 function parseSortInput(raw) {
     return raw
@@ -432,12 +485,170 @@ function parseSortInput(raw) {
         .filter(value => !Number.isNaN(value));
 }
 
+function getCurrentSortInputData() {
+    return Array.isArray(uploadedSortData) && uploadedSortData.length > 0
+        ? [...uploadedSortData]
+        : parseSortInput(sortDataInput.value);
+}
+
+function createEmptyBattleLane() {
+    return {
+        algo: '',
+        history: [],
+        initialArray: [],
+        sortedArray: [],
+        direction: 'end',
+        requestMs: 0,
+        metrics: null,
+    };
+}
+
+function createEmptyBattleData() {
+    return {
+        left: createEmptyBattleLane(),
+        right: createEmptyBattleLane(),
+        maxSteps: 0,
+        winner: null,
+        loaded: false,
+    };
+}
+
+function getSortMeta(algo) {
+    return SORTING_META[algo] || {};
+}
+
+function getSortTitle(algo) {
+    return getSortMeta(algo).title || algo || 'Алгоритм';
+}
+
+function getBattleAlgo(side) {
+    return sortBattleEls[side]?.select?.value || '';
+}
+
+function getBattleDirection(side) {
+    const algo = getBattleAlgo(side);
+    return getSortMeta(algo).direction || 'end';
+}
+
+function stripMetricPrefix(value, prefix) {
+    return String(value || '').replace(new RegExp(`^${prefix}:\\s*`, 'i'), '') || '—';
+}
+
+function formatMetricNumber(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return '0';
+    return new Intl.NumberFormat('ru-RU').format(number);
+}
+
+function formatDuration(ms) {
+    const value = Number(ms);
+    if (!Number.isFinite(value) || value <= 0) return '0 мс';
+    if (value < 1000) return `${Math.round(value)} мс`;
+    return `${(value / 1000).toFixed(value < 10000 ? 1 : 0)} с`;
+}
+
+function setBattleBadge(side, text, className = '') {
+    const badge = sortBattleEls[side]?.badge;
+    if (!badge) return;
+    badge.textContent = text;
+    badge.className = `battle-result-badge${className ? ` ${className}` : ''}`;
+}
+
+function setBattleLaneClass(side, className = '') {
+    const lane = sortBattleEls[side]?.lane;
+    if (!lane) return;
+    lane.classList.remove('winner', 'finished');
+    if (className) lane.classList.add(className);
+}
+
+function updateSortModeButtons() {
+    sortModeButtons.forEach((button) => {
+        const isActive = button.dataset.sortMode === sortMode;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-pressed', String(isActive));
+    });
+}
+
+function updateSortingHeaderForMode() {
+    if (sortMode === 'battle') {
+        const leftAlgo = getBattleAlgo('left');
+        const rightAlgo = getBattleAlgo('right');
+        const leftMeta = getSortMeta(leftAlgo);
+        const rightMeta = getSortMeta(rightAlgo);
+
+        document.getElementById('sort-title').textContent = 'Батл сортировок';
+        document.getElementById('sort-desc').textContent = `${getSortTitle(leftAlgo)} vs ${getSortTitle(rightAlgo)}`;
+        document.getElementById('sort-time').textContent =
+            `${stripMetricPrefix(leftMeta.time, 'Время')} / ${stripMetricPrefix(rightMeta.time, 'Время')}`;
+        document.getElementById('sort-memory').textContent =
+            `${stripMetricPrefix(leftMeta.memory, 'Память')} / ${stripMetricPrefix(rightMeta.memory, 'Память')}`;
+        return;
+    }
+
+    const algo = document.getElementById('sort-algo').value;
+    if (algo && SORTING_META[algo]) {
+        const meta = SORTING_META[algo];
+        document.getElementById('sort-title').textContent = meta.title;
+        document.getElementById('sort-desc').textContent = meta.desc;
+        document.getElementById('sort-time').textContent = meta.time;
+        document.getElementById('sort-memory').textContent = meta.memory;
+    } else {
+        document.getElementById('sort-title').textContent = 'Сортировки';
+        document.getElementById('sort-desc').textContent = 'Выберите алгоритм и введите массив';
+        document.getElementById('sort-time').textContent = '';
+        document.getElementById('sort-memory').textContent = '';
+    }
+}
+
+function clearBattleView() {
+    for (const side of ['left', 'right']) {
+        const els = sortBattleEls[side];
+        const algo = getBattleAlgo(side);
+        if (els.title) els.title.textContent = getSortTitle(algo);
+        if (els.metrics) els.metrics.innerHTML = '';
+        if (els.plot) els.plot.innerHTML = '';
+        if (els.status) els.status.textContent = '';
+        setBattleBadge(side, 'Готов');
+        setBattleLaneClass(side);
+    }
+
+    if (sortBattleSummary) {
+        sortBattleSummary.textContent = '';
+        sortBattleSummary.style.display = sortMode === 'battle' ? 'block' : 'none';
+    }
+}
+
+function setSortMode(mode, options = {}) {
+    sortMode = mode === 'battle' ? 'battle' : 'single';
+    updateSortModeButtons();
+
+    if (sortSingleRow) sortSingleRow.style.display = sortMode === 'single' ? 'flex' : 'none';
+    if (sortBattlePicker) sortBattlePicker.style.display = sortMode === 'battle' ? 'grid' : 'none';
+    if (sortSingleViz) sortSingleViz.style.display = sortMode === 'single' ? 'flex' : 'none';
+    if (sortBattleViz) sortBattleViz.style.display = sortMode === 'battle' ? 'grid' : 'none';
+    if (sortBattleSummary) sortBattleSummary.style.display = sortMode === 'battle' ? 'block' : 'none';
+    if (sortDownloadFileBtn) sortDownloadFileBtn.style.display = sortMode === 'single' ? 'inline-flex' : 'none';
+
+    if (options.reset !== false) {
+        resetSortingSession();
+    }
+
+    updateSortingHeaderForMode();
+    renderSortInputPreview();
+    refreshIcons();
+}
+
 function setSortFileNameLabel(fileName = '') {
     if (!sortFileName) return;
     sortFileName.textContent = fileName || 'Файл не выбран';
 }
 
 function renderSortInputPreview() {
+    if (sortMode === 'battle') {
+        renderBattleInputPreview();
+        return;
+    }
+
     if (!sortPlot) return;
 
     const data = parseSortInput(sortDataInput.value);
@@ -453,12 +664,35 @@ function renderSortInputPreview() {
     renderSortingCells(sortPlot, data, -1, -1, 0, sortPlayer.speed, direction, MAX_SORT_VISUAL_ITEMS);
 }
 
+function renderBattleInputPreview() {
+    const data = parseSortInput(sortDataInput.value);
+    clearBattleView();
+    updateSortingHeaderForMode();
+
+    if (data.length === 0) {
+        if (sortBattleSummary) sortBattleSummary.textContent = '';
+        return;
+    }
+
+    for (const side of ['left', 'right']) {
+        const plot = sortBattleEls[side]?.plot;
+        if (!plot) continue;
+        renderSortingCells(plot, data, -1, -1, 0, sortPlayer.speed, getBattleDirection(side), MAX_SORT_VISUAL_ITEMS);
+    }
+
+    if (sortBattleSummary) {
+        sortBattleSummary.textContent = 'Готово к сравнению';
+    }
+}
+
 function resetSortingSession() {
     stopPlayer(sortPlayer);
     sortPlayer.steps = [];
     sortPlayer.current = 0;
-    sortData = { history: [], initialArray: [], sortedArray: [] };
+    sortData = { history: [], initialArray: [], sortedArray: [], direction: 'end' };
+    sortBattleData = createEmptyBattleData();
     if (sortPlot) sortPlot.innerHTML = '';
+    clearBattleView();
     if (sortPlayer.el.status) sortPlayer.el.status.textContent = '';
 }
 
@@ -665,17 +899,153 @@ function ensureFinalSortingGreenStep(history, algo, initialArray, sortedArray) {
     return safeHistory;
 }
 
-function applySortingResult(result, algo) {
-    sortData.initialArray = Array.isArray(result.initial_array) ? result.initial_array : [];
-    sortData.sortedArray = Array.isArray(result.sorted_array)
-        ? result.sorted_array
-        : [];
-    sortData.history = ensureFinalSortingGreenStep(
-        result.history,
+function isBogoHistoryStep(step) {
+    return Array.isArray(step?.indexes);
+}
+
+function isInsertionHistoryStep(step) {
+    return Object.prototype.hasOwnProperty.call(step ?? {}, 'is_shift')
+        && Object.prototype.hasOwnProperty.call(step ?? {}, 'value');
+}
+
+function isCountingHistoryStep(step) {
+    return Object.prototype.hasOwnProperty.call(step ?? {}, 'phase')
+        || (
+            Object.prototype.hasOwnProperty.call(step ?? {}, 'nums_elems')
+            && step?.nums_elems !== null
+            && typeof step?.nums_elems === 'object'
+            && !Array.isArray(step?.nums_elems)
+        );
+}
+
+function createNormalizedSortingResult(result, algo, requestMs = 0) {
+    const initialArray = Array.isArray(result.initial_array) ? result.initial_array : [];
+    const sortedArray = Array.isArray(result.sorted_array) ? result.sorted_array : [];
+    const history = ensureFinalSortingGreenStep(result.history, algo, initialArray, sortedArray);
+    const direction = result.direction || getSortMeta(algo).direction || 'end';
+
+    return {
         algo,
-        sortData.initialArray,
-        sortData.sortedArray
-    );
+        initialArray,
+        sortedArray,
+        history,
+        direction,
+        requestMs,
+        metrics: calculateSortingMetrics(history, algo, requestMs),
+    };
+}
+
+function calculateSortingMetrics(history, algo, requestMs = 0) {
+    const safeHistory = Array.isArray(history) ? history : [];
+    let comparisons = 0;
+    let swaps = 0;
+    let writes = 0;
+    let shuffles = 0;
+    let countingReads = 0;
+
+    for (const step of safeHistory) {
+        if (isBogoHistoryStep(step)) {
+            if (!step.is_sorted) shuffles++;
+            continue;
+        }
+
+        if (isCountingHistoryStep(step)) {
+            if (step.phase === 'count' || step.nums_elems) countingReads++;
+            if (step.phase === 'build' || step.phase === 'done') writes++;
+            continue;
+        }
+
+        const { compareA, compareB } = getSortingStepCompareIndexes(step);
+        if (compareA >= 0 && compareB >= 0) comparisons++;
+        if (step?.is_swap) swaps++;
+        if (isInsertionHistoryStep(step)) writes++;
+    }
+
+    const operationValue = algo === 'bogo'
+        ? shuffles
+        : algo === 'counting'
+            ? countingReads
+            : comparisons;
+    const operationLabel = algo === 'bogo'
+        ? 'Перемешивания'
+        : algo === 'counting'
+            ? 'Подсчёты'
+            : 'Сравнения';
+    const mutationLabel = algo === 'counting' || algo === 'insertion'
+        ? 'Записи'
+        : 'Обмены';
+    const mutationValue = algo === 'counting' || algo === 'insertion'
+        ? writes
+        : swaps;
+
+    return {
+        steps: safeHistory.length,
+        operationLabel,
+        operationValue,
+        mutationLabel,
+        mutationValue,
+        visualMs: Math.max(0, safeHistory.length - 1) * sortPlayer.speed,
+        requestMs,
+    };
+}
+
+function renderBattleMetrics(side) {
+    const lane = sortBattleData[side];
+    const metricsEl = sortBattleEls[side]?.metrics;
+    if (!lane || !metricsEl) return;
+
+    const meta = getSortMeta(lane.algo);
+    const metrics = calculateSortingMetrics(lane.history, lane.algo, lane.requestMs);
+    lane.metrics = metrics;
+    const entries = [
+        ['Шаги', formatMetricNumber(metrics.steps)],
+        [metrics.operationLabel, formatMetricNumber(metrics.operationValue)],
+        [metrics.mutationLabel, formatMetricNumber(metrics.mutationValue)],
+        ['Визуально', formatDuration(metrics.visualMs)],
+        ['Оценка', stripMetricPrefix(meta.time, 'Время')],
+        ['Память', stripMetricPrefix(meta.memory, 'Память')],
+        ['Подготовка', formatDuration(metrics.requestMs)],
+    ];
+
+    metricsEl.innerHTML = entries.map(([label, value]) => `
+        <div class="battle-metric">
+            <span class="battle-metric-label">${label}</span>
+            <span class="battle-metric-value">${value}</span>
+        </div>
+    `).join('');
+}
+
+function getBattleWinner(left, right) {
+    if (!left.history.length || !right.history.length) return null;
+    if (left.history.length === right.history.length) return 'tie';
+    return left.history.length < right.history.length ? 'left' : 'right';
+}
+
+function renderBattleSummary() {
+    if (!sortBattleSummary || !sortBattleData.loaded) return;
+
+    const leftTitle = getSortTitle(sortBattleData.left.algo);
+    const rightTitle = getSortTitle(sortBattleData.right.algo);
+    const leftSteps = sortBattleData.left.history.length;
+    const rightSteps = sortBattleData.right.history.length;
+
+    if (sortBattleData.winner === 'tie') {
+        sortBattleSummary.textContent = `Ничья: ${leftTitle} и ${rightTitle} прошли по ${leftSteps} шагов`;
+        return;
+    }
+
+    const winner = sortBattleData.winner === 'left' ? sortBattleData.left : sortBattleData.right;
+    const loser = sortBattleData.winner === 'left' ? sortBattleData.right : sortBattleData.left;
+    sortBattleSummary.textContent =
+        `${getSortTitle(winner.algo)} быстрее по визуальным шагам: ${winner.history.length} против ${loser.history.length}`;
+}
+
+function applySortingResult(result, algo) {
+    const normalized = createNormalizedSortingResult(result, algo);
+    sortData.initialArray = normalized.initialArray;
+    sortData.sortedArray = normalized.sortedArray;
+    sortData.history = normalized.history;
+    sortData.direction = normalized.direction;
     sortPlayer.steps = sortData.history;
     sortPlayer.current = 0;
 
@@ -692,7 +1062,7 @@ function applySortingResult(result, algo) {
         return;
     }
 
-    const direction = result.direction || meta.direction || 'end';
+    const direction = normalized.direction || meta.direction || 'end';
     const firstStep = sortData.history[0] || {};
     const { compareA, compareB } = getSortingStepCompareIndexes(firstStep);
     const sortedNum = Number.isInteger(firstStep.sorted_num) ? firstStep.sorted_num : 0;
@@ -809,16 +1179,15 @@ if (sortDownloadFileBtn) {
     });
 }
 
-async function loadSortingData() {
-    const raw = sortDataInput.value;
-    const data = Array.isArray(uploadedSortData) && uploadedSortData.length > 0
-        ? [...uploadedSortData]
-        : parseSortInput(raw);
+async function loadSortingData(algoOverride = null, dataOverride = null) {
+    const data = Array.isArray(dataOverride)
+        ? [...dataOverride]
+        : getCurrentSortInputData();
     if (data.length === 0) {
         throw new Error('Введите числа через запятую');
     }
 
-    const algo = document.getElementById('sort-algo').value;
+    const algo = algoOverride || document.getElementById('sort-algo').value;
     if (!algo) {
         throw new Error('Выберите алгоритм сортировки');
     }
@@ -838,7 +1207,94 @@ async function loadSortingData() {
     return await res.json();
 }
 
+async function loadBattleLaneData(side, data) {
+    const algo = getBattleAlgo(side);
+    const startedAt = performance.now();
+    const result = await loadSortingData(algo, data);
+    const requestMs = performance.now() - startedAt;
+    return createNormalizedSortingResult(result, algo, requestMs);
+}
+
+async function loadBattleSortingData() {
+    const leftAlgo = getBattleAlgo('left');
+    const rightAlgo = getBattleAlgo('right');
+
+    if (!leftAlgo || !rightAlgo) {
+        throw new Error('Выберите два алгоритма');
+    }
+    if (leftAlgo === rightAlgo) {
+        throw new Error('Выберите два разных алгоритма');
+    }
+
+    const data = getCurrentSortInputData();
+    if (data.length === 0) {
+        throw new Error('Введите числа через запятую');
+    }
+
+    const [left, right] = await Promise.all([
+        loadBattleLaneData('left', data),
+        loadBattleLaneData('right', data),
+    ]);
+
+    sortBattleData.left = left;
+    sortBattleData.right = right;
+    sortBattleData.maxSteps = Math.max(left.history.length, right.history.length);
+    sortBattleData.winner = getBattleWinner(left, right);
+    sortBattleData.loaded = true;
+    sortPlayer.steps = Array.from({ length: sortBattleData.maxSteps }, (_, idx) => idx);
+    sortPlayer.current = 0;
+
+    for (const side of ['left', 'right']) {
+        const lane = sortBattleData[side];
+        const els = sortBattleEls[side];
+        if (els.title) els.title.textContent = getSortTitle(lane.algo);
+        renderBattleMetrics(side);
+    }
+
+    renderBattleStep(0);
+    renderBattleSummary();
+}
+
+async function ensureBattleDataLoaded() {
+    if (sortBattleData.loaded && sortBattleData.maxSteps > 0) return true;
+
+    sortPlayer.el.status.textContent = 'Загрузка батла...';
+    for (const side of ['left', 'right']) {
+        setBattleBadge(side, 'Загрузка');
+    }
+
+    try {
+        await loadBattleSortingData();
+        sortPlayer.el.controls.style.display = 'flex';
+        sortPlayer.el.status.textContent = 'Батл готов к запуску';
+        return true;
+    } catch (e) {
+        sortPlayer.el.status.textContent = `Ошибка: ${e.message}`;
+        console.error(e);
+        return false;
+    }
+}
+
+function renderActiveSortStep(idx) {
+    if (sortMode === 'battle') {
+        renderBattleStep(idx);
+    } else {
+        renderSortStep(idx);
+    }
+}
+
 sortPlayer.el.play.addEventListener('click', async () => {
+    if (sortMode === 'battle') {
+        if (sortPlayer.playing) {
+            stopPlayer(sortPlayer);
+            return;
+        }
+
+        const ready = await ensureBattleDataLoaded();
+        if (ready) startPlayer(sortPlayer, renderBattleStep);
+        return;
+    }
+
     const algo = document.getElementById('sort-algo').value;
 
     if (sortPlayer.steps.length === 0 || !sortData.initialArray.length) {
@@ -866,14 +1322,14 @@ sortPlayer.el.prev.addEventListener('click', () => {
     if (sortPlayer.current > 0) {
         stopPlayer(sortPlayer);
         sortPlayer.current--;
-        renderSortStep(sortPlayer.current);
+        renderActiveSortStep(sortPlayer.current);
     }
 });
 
 sortPlayer.el.next.addEventListener('click', () => {
     if (sortPlayer.current < sortPlayer.steps.length - 1) {
         sortPlayer.current++;
-        renderSortStep(sortPlayer.current);
+        renderActiveSortStep(sortPlayer.current);
     } else {
         stopPlayer(sortPlayer);
     }
@@ -882,12 +1338,55 @@ sortPlayer.el.next.addEventListener('click', () => {
 sortPlayer.el.speed.addEventListener('input', (e) => {
     sortPlayer.speed = parseInt(e.target.value);
     sortPlayer.el.speedVal.textContent = sortPlayer.speed + 'ms';
+    if (sortMode === 'battle' && sortBattleData.loaded) {
+        renderBattleMetrics('left');
+        renderBattleMetrics('right');
+        renderBattleSummary();
+    }
 });
+
+function renderBattleStep(idx) {
+    if (!sortBattleData.loaded) return;
+
+    for (const side of ['left', 'right']) {
+        const lane = sortBattleData[side];
+        const els = sortBattleEls[side];
+        if (!lane.history.length || !els.plot) continue;
+
+        const laneIdx = Math.min(idx, lane.history.length - 1);
+        const msg = updateSortingStep(
+            els.plot,
+            lane.history,
+            lane.initialArray,
+            laneIdx,
+            sortPlayer.speed,
+            lane.direction,
+            MAX_SORT_VISUAL_ITEMS
+        );
+
+        const isFinished = idx >= lane.history.length - 1;
+        const isWinner = sortBattleData.winner === side;
+        if (els.status) {
+            els.status.textContent = `${laneIdx + 1} / ${lane.history.length}: ${msg}`;
+        }
+
+        if (isFinished) {
+            setBattleBadge(side, isWinner ? 'Быстрее' : 'Финиш', isWinner ? 'winner' : 'finished');
+            setBattleLaneClass(side, isWinner ? 'winner' : 'finished');
+        } else {
+            setBattleBadge(side, `Шаг ${laneIdx + 1}`);
+            setBattleLaneClass(side);
+        }
+    }
+
+    renderBattleSummary();
+    sortPlayer.el.status.textContent = `Батл: шаг ${Math.min(idx + 1, sortBattleData.maxSteps)} / ${sortBattleData.maxSteps}`;
+}
 
 function renderSortStep(idx) {
     const algo = document.getElementById('sort-algo').value;
     const meta = SORTING_META[algo] || {};
-    const direction = sortData.history[idx]?.direction || meta.direction || 'end';
+    const direction = sortData.history[idx]?.direction || sortData.direction || meta.direction || 'end';
 
     const msg = updateSortingStep(
         sortPlot,
@@ -958,11 +1457,11 @@ function setSearchResultIndexes(indexes) {
     }
 
     if (indexes.length === 1) {
-        searchResultIndexes.textContent = `✅ Индекс первого совпадения: ${indexes[0]}`;
+        searchResultIndexes.textContent = `Индекс первого совпадения: ${indexes[0]}`;
         return;
     }
 
-    searchResultIndexes.textContent = `✅ Индексы совпадений: ${indexes.join(', ')}`;
+    searchResultIndexes.textContent = `Индексы совпадений: ${indexes.join(', ')}`;
 }
 
 function resetSearchSession() {
@@ -1332,9 +1831,9 @@ function renderSearchStep(idx) {
         : [];
 
     if (visibleResult.length === 1) {
-        searchPlayer.el.status.textContent = `✅ Индекс первого совпадения: ${visibleResult[0]}`;
+        searchPlayer.el.status.textContent = `Индекс первого совпадения: ${visibleResult[0]}`;
     } else if (visibleResult.length > 1) {
-        searchPlayer.el.status.textContent = `✅ Индексы совпадений: ${visibleResult.join(', ')}`;
+        searchPlayer.el.status.textContent = `Индексы совпадений: ${visibleResult.join(', ')}`;
     } else {
         searchPlayer.el.status.textContent = '❌ Совпадений не найдено';
     }
@@ -1981,7 +2480,7 @@ function startPlayer(player, renderFn) {
                     stopPlayer(player);
                     // Принудительно обновляем статус, чтобы гарантировать вывод индекса
                     const foundPos = currentStep['found_pos'] !== undefined ? currentStep['found_pos'] : currentStep['match_start_pos'];
-                    player.el.status.textContent = `✅ Индекс первого совпадения: ${foundPos}`;
+                    player.el.status.textContent = `Индекс первого совпадения: ${foundPos}`;
                     return;
                 }
             }
